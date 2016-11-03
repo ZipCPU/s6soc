@@ -54,7 +54,21 @@ int main(int argc, char **argv) {
 	const	char	*fname = (argc>=3)?argv[2]:NULL;
 	int	ttyfd = -1, dumpfd = -1;
 
+	if (argc < 2) {
+		fprintf(stderr, "USAGE: dumpuart /dev/tty... \n");
+		exit(EXIT_FAILURE);
+	}
+
 	ttyfd = open(dev, O_RDONLY);
+	if (ttyfd < 0) {
+		fprintf(stderr, "Could not open device, %s\n", dev);
+		exit(EXIT_FAILURE);
+	}
+	if (!isatty(ttyfd)) {
+		fprintf(stderr, "Err: %s is not a terminal!\n", dev);
+		exit(EXIT_FAILURE);
+	}
+
 	if (fname)
 		dumpfd = open(fname, O_CREAT|O_TRUNC|O_WRONLY, 0644);
 
