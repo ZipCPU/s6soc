@@ -40,9 +40,9 @@
 //
 `define	INCLUDE_ZIPPY
 `define	IMPLEMENT_ONCHIP_RAM
-`ifndef	VERILATOR
-`define	FANCY_ICAP_ACCESS
-`endif
+// `ifndef	VERILATOR
+// `define	FANCY_ICAP_ACCESS
+// `endif
 `define	FLASH_ACCESS
 `define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
 // `define	COMPRESSED_SCOPE
@@ -463,12 +463,19 @@ module	busmaster(i_clk, i_rst,
 	//
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
+`ifdef	FLASH_ACCESS
 	wbqspiflash #(24)	flashmem(i_clk,
 		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
 			wb_addr[(24-3):0], wb_data,
 		flash_ack, flash_stall, flash_data,
 		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat,
 		flash_interrupt);
+`else
+	assign o_qspi_sck  = 1'b0;
+	assign o_qspi_cs_n = 1'b0;
+	assign o_qspi_mod  = 2'b0;
+	assign o_qspi_dat  = 4'b0;
+`endif
 
 	//
 	//	MULTIBOOT/ICAPE2 CONFIGURATION ACCESS
