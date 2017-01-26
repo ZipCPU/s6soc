@@ -16,7 +16,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -35,12 +35,13 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 //
-module	memdev(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
+module	memdev(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data, i_wb_sel,
 		o_wb_ack, o_wb_stall, o_wb_data);
 	parameter	AW=15, DW=32;
 	input				i_clk, i_wb_cyc, i_wb_stb, i_wb_we;
 	input		[(AW-1):0]	i_wb_addr;
 	input		[(DW-1):0]	i_wb_data;
+	input		[(DW/8-1):0]	i_wb_sel;
 	output	reg			o_wb_ack;
 	output	wire			o_wb_stall;
 	output	reg	[(DW-1):0]	o_wb_data;
@@ -49,8 +50,17 @@ module	memdev(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 	always @(posedge i_clk)
 		o_wb_data <= mem[i_wb_addr];
 	always @(posedge i_clk)
-		if ((i_wb_stb)&&(i_wb_we))
-			mem[i_wb_addr] <= i_wb_data;
+		if ((i_wb_stb)&&(i_wb_we)&&(i_wb_sel[3]))
+			mem[i_wb_addr][31:24] <= i_wb_data[31:24];
+	always @(posedge i_clk)
+		if ((i_wb_stb)&&(i_wb_we)&&(i_wb_sel[2]))
+			mem[i_wb_addr][23:16] <= i_wb_data[23:16];
+	always @(posedge i_clk)
+		if ((i_wb_stb)&&(i_wb_we)&&(i_wb_sel[1]))
+			mem[i_wb_addr][15:8] <= i_wb_data[15:8];
+	always @(posedge i_clk)
+		if ((i_wb_stb)&&(i_wb_we)&&(i_wb_sel[0]))
+			mem[i_wb_addr][7:0] <= i_wb_data[7:0];
 	always @(posedge i_clk)
 		o_wb_ack <= (i_wb_stb);
 	assign	o_wb_stall = 1'b0;

@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -64,9 +64,11 @@ module	busmaster(i_clk, i_rst,
 		o_uart_setup,
 		// GPIO lines
 		i_gpio, o_gpio);
-	parameter	BUS_ADDRESS_WIDTH=23, ZIP_ADDRESS_WIDTH=BUS_ADDRESS_WIDTH,
-			CMOD_ZIPCPU_RESET_ADDRESS=23'h480000,
-			ZA=ZIP_ADDRESS_WIDTH, BAW=BUS_ADDRESS_WIDTH; // 24bits->2,258,23b->2181
+	parameter	BUS_ADDRESS_WIDTH=23,
+			ZIP_ADDRESS_WIDTH=BUS_ADDRESS_WIDTH,
+			CMOD_ZIPCPU_RESET_ADDRESS=23'h480000;
+	localparam	ZA=ZIP_ADDRESS_WIDTH,
+			BAW=BUS_ADDRESS_WIDTH; // 24bits->2,258,23b->2181
 	input			i_clk, i_rst;
 	input			i_rx_stb;
 	input		[7:0]	i_rx_data;
@@ -101,6 +103,7 @@ module	busmaster(i_clk, i_rst,
 	//
 	wire		wb_cyc, wb_stb, wb_we, wb_stall, wb_ack, wb_err;
 	wire	[31:0]	wb_data, wb_idata;
+	wire	[3:0]	wb_sel;
 	wire	[(BAW-1):0]	wb_addr;
 	wire	[5:0]		io_addr;
 	assign	io_addr = {
@@ -173,7 +176,7 @@ module	busmaster(i_clk, i_rst,
 	zipbones #(CMOD_ZIPCPU_RESET_ADDRESS,ZA,6)
 		thecpu(i_clk, btn_reset, // 1'b0,
 			// Zippys wishbone interface
-			wb_cyc, wb_stb, wb_we, w_zip_addr, wb_data,
+			wb_cyc, wb_stb, wb_we, w_zip_addr, wb_data, wb_sel,
 				wb_ack, wb_stall, wb_idata, wb_err,
 			w_interrupt, zip_cpu_int,
 			// Debug wishbone interface -- not really used
@@ -502,7 +505,8 @@ module	busmaster(i_clk, i_rst,
 	//
 `ifdef	IMPLEMENT_ONCHIP_RAM
 	memdev	#(12) ram(i_clk, wb_cyc, (wb_stb)&&(mem_sel), wb_we,
-			wb_addr[11:0], wb_data, mem_ack, mem_stall, mem_data);
+			wb_addr[11:0], wb_data, wb_sel,
+			mem_ack, mem_stall, mem_data);
 `else
 	assign	mem_data = 32'h00;
 	assign	mem_stall = 1'b0;
