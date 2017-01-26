@@ -170,7 +170,7 @@ module	zipsystem(i_clk, i_rst,
 		, o_cpu_debug
 `endif
 		);
-	parameter	RESET_ADDRESS=24'h0100000, ADDRESS_WIDTH=24,
+	parameter	RESET_ADDRESS=32'h0100000, ADDRESS_WIDTH=32,
 			LGICACHE=10, START_HALTED=1, EXTERNAL_INTERRUPTS=1,
 `ifdef	OPT_MULTIPLY
 			IMPLEMENT_MPY = `OPT_MULTIPLY,
@@ -308,7 +308,7 @@ module	zipsystem(i_clk, i_rst,
 	always @(posedge i_clk)
 		cmd_reset <= ((dbg_cmd_write)&&(dbg_idata[6]));
 	//
-	initial	cmd_halt  = 1'b1;
+	initial	cmd_halt  = START_HALTED;
 	always @(posedge i_clk)
 		if (i_rst)
 			cmd_halt <= (START_HALTED == 1)? 1'b1 : 1'b0;
@@ -317,6 +317,7 @@ module	zipsystem(i_clk, i_rst,
 		else if ((cmd_step)||(cpu_break))
 			cmd_halt  <= 1'b1;
 
+	initial	cmd_clear_pf_cache = 1'b1;
 	always @(posedge i_clk)
 		cmd_clear_pf_cache = (~i_rst)&&(dbg_cmd_write)
 					&&((dbg_idata[11])||(dbg_idata[6]));
@@ -522,6 +523,9 @@ module	zipsystem(i_clk, i_rst,
 	wire	[31:0]	dc_data;
 	wire	[(AW-1):0]	dc_addr;
 	wire		cpu_gbl_cyc;
+	wire	[31:0]	dmac_int_vec;
+	assign	dmac_int_vec = { 1'b0, alt_int_vector, 1'b0,
+					main_int_vector[14:1], 1'b0 };
 	assign	dmac_stb = (sys_stb)&&(sys_addr[4]);
 `ifdef	INCLUDE_DMA_CONTROLLER
 	wbdmac	#(AW) dma_controller(i_clk, cpu_reset,
@@ -532,8 +536,7 @@ module	zipsystem(i_clk, i_rst,
 				dc_cyc, dc_stb, dc_we, dc_addr, dc_data,
 					dc_ack, dc_stall, ext_idata, dc_err,
 				// External device interrupts
-				{ 1'b0, alt_int_vector, 1'b0,
-					main_int_vector[14:1], 1'b0 },
+				dmac_int_vec,
 				// DMAC interrupt, for upon completion
 				dmac_int);
 `else
@@ -556,7 +559,7 @@ module	zipsystem(i_clk, i_rst,
 	wire		ctri_sel, ctri_stall;
 	reg		ctri_ack;
 	wire	[31:0]	ctri_data;
-	assign	ctri_sel = (sys_cyc)&&(sys_stb)&&(sys_addr == `CTRINT);
+	assign	ctri_sel = (sys_stb)&&(sys_addr == `CTRINT);
 	always @(posedge i_clk)
 		ctri_ack <= ctri_sel;
 	assign	ctri_stall = 1'b0;
@@ -660,7 +663,7 @@ module	zipsystem(i_clk, i_rst,
 	assign	pic_stall = 1'b0;
 	reg	pic_ack;
 	always @(posedge i_clk)
-		pic_ack <= (sys_cyc)&&(sys_stb)&&(sys_addr == `INTCTRL);
+		pic_ack <= (sys_stb)&&(sys_addr == `INTCTRL);
 
 	//
 	// The CPU itself
