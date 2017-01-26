@@ -49,10 +49,10 @@ module	memdev(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 	always @(posedge i_clk)
 		o_wb_data <= mem[i_wb_addr];
 	always @(posedge i_clk)
-		if ((i_wb_cyc)&&(i_wb_stb)&&(i_wb_we))
+		if ((i_wb_stb)&&(i_wb_we))
 			mem[i_wb_addr] <= i_wb_data;
 	always @(posedge i_clk)
-		o_wb_ack <= (i_wb_cyc)&&(i_wb_stb);
+		o_wb_ack <= (i_wb_stb);
 	assign	o_wb_stall = 1'b0;
 
 endmodule
