@@ -61,4 +61,8 @@ projects.  It currently does all that I have asked of it and all that I intended
 the project to do.  Please feel free to write if you have comments, thoughts,
 questions, or even suggestions.
 
+20170126: I'm in the process of updating the project to work with the newer version of the ZipCPU--the one that can handle the more traditional 8-bit bytes, rather than the 32-bit bytes the original ZipCPU could only handle.
+
+Once this update is complete, and proven working on my desktop, I'll merge this branch into the master, but until then it is just a work in progress.
+
 
