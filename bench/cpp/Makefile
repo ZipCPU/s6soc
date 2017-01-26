@@ -38,10 +38,11 @@ CXX	:= g++
 FLAGS	:= -Wall -Og -g
 SWHOST	:= ../../sw/host
 RTLD	:= ../../rtl
-INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I/usr/share/verilator/include	\
-	-I$(SWHOST)
+VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+VROOT   := $(VERILATOR_ROOT)
+INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VROOT)/include -I$(SWHOST)
 SOURCES := zip_sim.cpp twoc.cpp qspiflashsim.cpp uartsim.cpp
-VLIB	:= /usr/share/verilator/include/verilated.cpp
+VLIB	:= $(VROOT)/include/verilated.cpp
 RAWLIB	:= $(VLIB) $(RTLD)/obj_dir/Vbusmaster__ALL.a
 LIBS	:= $(RAWLIB) -lelf
 TESTF	:= $(ZASM)/z.out
