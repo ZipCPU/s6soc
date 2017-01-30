@@ -133,7 +133,7 @@ public:
 		if (m_dbg) fprintf(m_dbg, "%10ld - PC: %08x:%08x [%08x:%08x:%08x:%08x:%08x],%08x,%08x,%d,%08x,%08x (%x,%x/0x%08x)\n",
 			m_tickcount,
 			m_core->v__DOT__thecpu__DOT__thecpu__DOT__ipc,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__upc,
+			m_core->v__DOT__thecpu__DOT__thecpu__DOT__r_upc,
 			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[0],
 			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[1],
 			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[2],
