@@ -57,11 +57,11 @@ ALTSRC := altbusmaster.v builddate.v flash_config.v wbqspiflash.v	\
 VOBJ := obj_dir
 
 $(VOBJ)/Vbusmaster.cpp: $(MAINSRC)
-	verilator -cc -y $(CPUD) busmaster.v
+	verilator -trace -cc -y $(CPUD) busmaster.v
 $(VOBJ)/Vbusmaster.h: $(VOBJ)/Vbusmaster.cpp
 
 $(VOBJ)/Valtbusmaster.cpp: $(ALTSRC)
-	verilator -cc -y $(CPUD) altbusmaster.v
+	verilator -trace -cc -y $(CPUD) altbusmaster.v
 $(VOBJ)/Valtbusmaster.h: $(VOBJ)/Valtbusmaster.cpp
 
 $(VOBJ)/Vbusmaster__ALL.a: $(VOBJ)/Vbusmaster.cpp $(VOBJ)/Vbusmaster.h
