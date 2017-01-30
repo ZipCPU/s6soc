@@ -35,21 +35,30 @@
 all: zip_sim
 
 CXX	:= g++
-FLAGS	:= -Wall -Og -g
+CFLAGS	:= -Wall -Og -g
+OBJDIR  := obj-pc
 SWHOST	:= ../../sw/host
 RTLD	:= ../../rtl
 VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
 VROOT   := $(VERILATOR_ROOT)
 INCS	:= -I$(RTLD)/obj_dir/ -I$(RTLD) -I$(VROOT)/include -I$(SWHOST)
 SOURCES := zip_sim.cpp twoc.cpp qspiflashsim.cpp uartsim.cpp
-VLIB	:= $(VROOT)/include/verilated.cpp
-RAWLIB	:= $(VLIB) $(RTLD)/obj_dir/Vbusmaster__ALL.a
+VLSRCS	:= verilated.cpp verilated_vcd_c.cpp
+RAWLIB	:= $(RTLD)/obj_dir/Vbusmaster__ALL.a
+OBJECTS := $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES) $(VLSRCS)))
 LIBS	:= $(RAWLIB) -lelf
 TESTF	:= $(ZASM)/z.out
 DHRYSTONEF := ../asm/zipdhry.z
 
-zip_sim: $(SOURCES) $(RAWLIB) testb.h
-	$(CXX) $(FLAGS) $(INCS) $(SOURCES) $(LIBS) -o $@
+$(OBJDIR)/%.o: %.cpp
+	$(CXX) $(CFLAGS) $(INCS) -c $^ -o $@
+$(OBJDIR)/%.o: $(VROOT)/include/%.cpp
+	$(CXX) $(CFLAGS) $(INCS) -c $^ -o $@
+
+zip_sim: $(OBJECTS)
+	$(CXX) $(CFLAGS) $(INCS) $(OBJECTS) $(LIBS) -o $@
+
+.PHONY:
 
 # .PHONY: stest
 # stest: zippy_tb
@@ -67,6 +76,28 @@ zip_sim: $(SOURCES) $(RAWLIB) testb.h
 # dhrystone: zippy_tb
 	# ./zippy_tb -a $(DHRYSTONEF)
 
+define	build-depends
+	@$(CXX) $(CFLAGS) $(INCS) -MM $(SOURCES) > $(OBJDIR)/xdepends.txt
+	@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
+	@rm $(OBJDIR)/xdepends.txt
+endef
+
+.PHONY: depends
+depends: tags $(OBJDIR)/
+	$(build-depends)
+
+tags:
+	@ctags $(SOURCES) $(addprefix $(VROOT)/include/,$(VLSRCS))
+
+
 .PHONY: clean
 clean:
+	rm -rf $(OBJDIR)/
 	rm ./zip_sim
+
+$(OBJDIR)/:
+	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR)/; fi"
+
+$(OBJDIR)/depends.txt: $(OBJDIR)/ depends
+
+-include $(OBJDIR)/depends.txt
