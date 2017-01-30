@@ -3,3 +3,4 @@ obj_dir/
 obj-pc/
 *.swp
 tags
+zip_sim
