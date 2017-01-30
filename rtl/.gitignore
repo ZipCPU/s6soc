@@ -1,0 +1,5 @@
+xilinx/
+obj_dir/
+obj-pc/
+*.swp
+tags
