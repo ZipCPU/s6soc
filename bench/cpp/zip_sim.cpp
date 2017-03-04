@@ -132,21 +132,21 @@ public:
 		
 		if (m_dbg) fprintf(m_dbg, "%10ld - PC: %08x:%08x [%08x:%08x:%08x:%08x:%08x],%08x,%08x,%d,%08x,%08x (%x,%x/0x%08x)\n",
 			m_tickcount,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__ipc,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__r_upc,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[0],
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[1],
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[2],
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[3],
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__regset[15],
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__instruction_decoder__DOT__r_I,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__r_opB,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__instruction_decoder__DOT__w_dcdR_pc,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__r_opA,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__wr_gpreg_vl,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__w_iflags,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__w_uflags,
-			m_core->v__DOT__thecpu__DOT__thecpu__DOT__pf_pc
+			m_core->v__DOT__swic__DOT__thecpu__DOT__ipc,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__r_upc,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[0],
+			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[1],
+			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[2],
+			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[3],
+			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[15],
+			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__r_I,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__r_op_Bv,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__w_dcdR_pc,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__r_op_Av,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__wr_gpreg_vl,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__w_iflags,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__w_uflags,
+			m_core->v__DOT__swic__DOT__thecpu__DOT__pf_pc
 			);
 		if ((!m_core->o_qspi_cs_n)&&(m_dbg))
 			fprintf(m_dbg, "QSPI: [CS,SCK,DAT (MOD)] = %d,%d,%02x,%d -> %04x %7s, state= %x/(%d)\n",
@@ -165,7 +165,8 @@ public:
 			(m_core->v__DOT__wb_stb)?"STB":"   ",
 			(m_core->v__DOT__wb_we )?"WE ":"   ",
 			(m_core->v__DOT__w_zip_addr),
-			(m_core->v__DOT__wb_data),
+#define	wb_data	v__DOT__swic__DOT__thecpu__DOT__mem_data
+			(m_core->wb_data),
 			(m_core->v__DOT__wb_ack)?"ACK":"   ",
 			(m_core->v__DOT__wb_stall)?"STL":"   ",
 			(m_core->v__DOT__wb_idata)
@@ -180,10 +181,10 @@ public:
 				(m_core->v__DOT__pic__DOT__r_interrupt)?" ---> INT!":"");
 		*/
 
-		if ((m_core->v__DOT__thecpu__DOT__thecpu__DOT__pf_valid)&&(m_dbg))
+		if ((m_core->v__DOT__swic__DOT__thecpu__DOT__pf_valid)&&(m_dbg))
 			fprintf(m_dbg, "PC: %08x - %08x, uart=%d,%d, pic = %d,%04x,%0d,%04x\n",
-				m_core->v__DOT__thecpu__DOT__thecpu__DOT__instruction_pc,
-				m_core->v__DOT__thecpu__DOT__thecpu__DOT__instruction,
+				m_core->v__DOT__swic__DOT__thecpu__DOT__pf_instruction_pc,
+				m_core->v__DOT__swic__DOT__thecpu__DOT__pf_instruction,
 				m_core->i_rx_stb, m_core->i_tx_busy,
 				m_core->v__DOT__pic__DOT__r_gie,
 				m_core->v__DOT__pic__DOT__r_int_enable,
