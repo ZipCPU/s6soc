@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -26,7 +26,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -39,240 +39,240 @@
 //
 module wbubus(i_clk,i_rx_stb,i_rx_data,o_wb_cyc,o_wb_stb,o_wb_we,o_wb_addr,
 o_wb_data,i_wb_ack,i_wb_stall,i_wb_err,i_wb_data,i_interrupt,o_tx_stb,o_tx_data
-,i_tx_busy,o_dbg);parameter LGWATCHDOG=19;input i_clk;input i_rx_stb;input[7:0
+,i_tx_busy,o_dbg);parameter LGWATCHDOG=12;input i_clk;input i_rx_stb;input[7:0
 ]i_rx_data;output wire o_wb_cyc,o_wb_stb,o_wb_we;output wire[31:0]o_wb_addr,
 o_wb_data;input i_wb_ack,i_wb_stall,i_wb_err;input[31:0]i_wb_data;input
 i_interrupt;output wire o_tx_stb;output wire[7:0]o_tx_data;input i_tx_busy;
-output wire o_dbg;reg GUwcb2;wire HUwcb2;wire[35:0]IUwcb2;JUwcb2 KUwcb2(i_clk,
-i_rx_stb,i_rx_data,HUwcb2,IUwcb2);wire LUwcb2,MUwcb2,NUwcb2,OUwcb2;wire[35:0]
-PUwcb2,QUwcb2;wire RUwcb2,SUwcb2;assign MUwcb2=(~LUwcb2)&&(RUwcb2);assign
-OUwcb2=GUwcb2;TUwcb2#(36,6)UUwcb2(i_clk,OUwcb2,HUwcb2,IUwcb2,MUwcb2,PUwcb2,
-RUwcb2,SUwcb2);VUwcb2 WUwcb2(i_clk,GUwcb2,MUwcb2,PUwcb2,LUwcb2,o_wb_cyc,
+output wire o_dbg;reg geVMD2;wire heVMD2;wire[35:0]ieVMD2;jeVMD2 keVMD2(i_clk,
+i_rx_stb,i_rx_data,heVMD2,ieVMD2);wire leVMD2,meVMD2,neVMD2,oeVMD2;wire[35:0]
+peVMD2,qeVMD2;wire reVMD2,seVMD2;assign meVMD2=(~leVMD2)&&(reVMD2);assign
+oeVMD2=geVMD2;teVMD2#(36,6)ueVMD2(i_clk,oeVMD2,heVMD2,ieVMD2,meVMD2,peVMD2,
+reVMD2,seVMD2);veVMD2 weVMD2(i_clk,geVMD2,meVMD2,peVMD2,leVMD2,o_wb_cyc,
 o_wb_stb,o_wb_we,o_wb_addr,o_wb_data,i_wb_ack,i_wb_stall,i_wb_err,i_wb_data,
-NUwcb2,QUwcb2);wire XUwcb2;YUwcb2 ZUwcb2(i_clk,OUwcb2,NUwcb2,QUwcb2,o_wb_cyc,
-i_interrupt,NUwcb2,o_tx_stb,o_tx_data,i_tx_busy,XUwcb2);reg[(LGWATCHDOG-1):0]
-aVwcb2;initial GUwcb2=1'd0;initial aVwcb2=0;always@(posedge i_clk)if((~o_wb_cyc
-)||(i_wb_ack))begin aVwcb2<=0;GUwcb2<=1'd0;end else if(&aVwcb2)begin GUwcb2<=
-1'd1;aVwcb2<=0;end else begin aVwcb2<=aVwcb2+{{(LGWATCHDOG-1){1'd0}},1'd1};
-GUwcb2<=1'd0;end assign o_dbg=OUwcb2;endmodule module bVwcb2(i_clk,cVwcb2,
-dVwcb2,eVwcb2,fVwcb2);input i_clk,cVwcb2;input[35:0]dVwcb2;output reg eVwcb2;
-output reg[35:0]fVwcb2;wire gVwcb2=(dVwcb2[35:33]==3'd3);reg[7:0]hVwcb2;initial
-hVwcb2=8'd0;always@(posedge i_clk)if((cVwcb2)&&(gVwcb2))hVwcb2<=hVwcb2+8'd1;reg
-[31:0]iVwcb2[0:255];always@(posedge i_clk)if(cVwcb2)iVwcb2[hVwcb2]<={dVwcb2[32
-:31],dVwcb2[29:0]};reg[35:0]jVwcb2;always@(posedge i_clk)if(cVwcb2)jVwcb2<=
-dVwcb2;reg[7:0]kVwcb2;always@(posedge i_clk)kVwcb2=hVwcb2-{jVwcb2[32:31],jVwcb2
-[29:24]};reg[24:0]lVwcb2;always@(posedge i_clk)case(jVwcb2[32:30])3'd0:lVwcb2
-<={19'd0,jVwcb2[29:24]};3'd2:lVwcb2<={13'd0,jVwcb2[29:18]};3'd4:lVwcb2<={7'd0,
-jVwcb2[29:12]};3'd6:lVwcb2<={1'd0,jVwcb2[29:6]};3'd1:lVwcb2<={{(19){jVwcb2[29]
-}},jVwcb2[29:24]};3'd3:lVwcb2<={{(13){jVwcb2[29]}},jVwcb2[29:18]};3'd5:lVwcb2
-<={{(7){jVwcb2[29]}},jVwcb2[29:12]};3'd7:lVwcb2<={{(1){jVwcb2[29]}},jVwcb2[29:6
-]};endcase wire[31:0]mVwcb2;assign mVwcb2={{(7){lVwcb2[24]}},lVwcb2};reg[9:0]
-nVwcb2;always@(posedge i_clk)if(~jVwcb2[34])nVwcb2<=10'd1+{6'd0,jVwcb2[33:31]}
-;else nVwcb2<=10'd9+{1'd0,jVwcb2[33:31],jVwcb2[29:24]};reg[31:0]oVwcb2;always@
-(posedge i_clk)oVwcb2<=iVwcb2[kVwcb2];reg[2:0]pVwcb2;initial pVwcb2=0;always@(
-posedge i_clk)pVwcb2<={pVwcb2[1:0],cVwcb2};always@(posedge i_clk)eVwcb2<=pVwcb2
-[2];always@(posedge i_clk)if(jVwcb2[35:30]==6'd46)fVwcb2<=jVwcb2;else casez(
-jVwcb2[35:30])6'b001??0:fVwcb2<={4'd0,mVwcb2[31:0]};6'b001??1:fVwcb2<={3'd1,
-mVwcb2[31:30],1'd1,mVwcb2[29:0]};6'b010???:fVwcb2<={3'd3,oVwcb2[31:30],jVwcb2[
-30],oVwcb2[29:0]};6'b10????:fVwcb2<={5'd24,jVwcb2[30],20'd0,nVwcb2};6'b11????:
-fVwcb2<={5'd24,jVwcb2[30],20'd0,nVwcb2};default:fVwcb2<=jVwcb2;endcase
-endmodule module TUwcb2(i_clk,qVwcb2,rVwcb2,sVwcb2,tVwcb2,uVwcb2,vVwcb2,wVwcb2
-);parameter BW=66,LGFLEN=10,FLEN=(1<<LGFLEN);input i_clk,qVwcb2;input rVwcb2;
-input[(BW-1):0]sVwcb2;input tVwcb2;output reg[(BW-1):0]uVwcb2;output reg vVwcb2
-;output wire wVwcb2;reg[(BW-1):0]xVwcb2[0:(FLEN-1)];reg[(LGFLEN-1):0]yVwcb2,
-zVwcb2;reg AVwcb2;initial AVwcb2=1'd0;always@(posedge i_clk)if(qVwcb2)AVwcb2<=
-1'd0;else if(tVwcb2)AVwcb2<=(AVwcb2)&&(rVwcb2);else if(rVwcb2)AVwcb2<=(yVwcb2+2
-==zVwcb2);else if(yVwcb2+1==zVwcb2)AVwcb2<=1'd1;initial yVwcb2=0;always@(
-posedge i_clk)if(qVwcb2)yVwcb2<={(LGFLEN){1'd0}};else if(rVwcb2)begin if((
-tVwcb2)||(~AVwcb2))yVwcb2<=yVwcb2+{{(LGFLEN-1){1'd0}},1'd1};end always@(posedge
-i_clk)if(rVwcb2)xVwcb2[yVwcb2]<=sVwcb2;reg BVwcb2;initial BVwcb2=1'd0;always@(
-posedge i_clk)if(qVwcb2)BVwcb2<=1'd0;else if(rVwcb2)BVwcb2<=(BVwcb2)&&(tVwcb2)
-;else if(tVwcb2)BVwcb2<=(zVwcb2+1==yVwcb2);else BVwcb2<=(zVwcb2==yVwcb2);
-initial zVwcb2=0;always@(posedge i_clk)if(qVwcb2)zVwcb2<={(LGFLEN){1'd0}};else
-if(tVwcb2)begin if((rVwcb2)||(~BVwcb2))zVwcb2<=zVwcb2+{{(LGFLEN-1){1'd0}},1'd1
-};end always@(posedge i_clk)uVwcb2<=xVwcb2[(tVwcb2)?(zVwcb2+{{(LGFLEN-1){1'd0}
-},1'd1}):(zVwcb2)];wire[(LGFLEN-1):0]CVwcb2;assign CVwcb2=yVwcb2+{{(LGFLEN-1){
-1'd0}},1'd1};assign wVwcb2=((rVwcb2)&&(AVwcb2)&&(~tVwcb2))||((tVwcb2)&&(BVwcb2
-)&&(~rVwcb2));wire[(LGFLEN-1):0]DVwcb2;assign DVwcb2=zVwcb2+{{(LGFLEN-1){1'd0}
-},1'd1};always@(posedge i_clk)if(qVwcb2)vVwcb2<=1'd0;else vVwcb2<=(~tVwcb2)&&(
-yVwcb2!=zVwcb2)||(tVwcb2)&&(yVwcb2!=DVwcb2);endmodule module YUwcb2(i_clk,
-qVwcb2,cVwcb2,EVwcb2,FVwcb2,GVwcb2,HVwcb2,eVwcb2,IVwcb2,i_tx_busy,JVwcb2);input
-i_clk,qVwcb2;input cVwcb2;input[35:0]EVwcb2;input FVwcb2,GVwcb2,HVwcb2;output
-wire eVwcb2;output wire[7:0]IVwcb2;input i_tx_busy;output wire JVwcb2;wire
-KVwcb2,LVwcb2,MVwcb2,NVwcb2;wire[35:0]OVwcb2;wire PVwcb2,QVwcb2,RVwcb2,SVwcb2,
-TVwcb2,UVwcb2,VVwcb2,WVwcb2;wire[35:0]XVwcb2,YVwcb2;wire[6:0]ZVwcb2,aWwcb2;
-assign KVwcb2=(MVwcb2)&&(~QVwcb2);TUwcb2#(36,10)bWwcb2(i_clk,qVwcb2,cVwcb2,
-EVwcb2,KVwcb2,OVwcb2,MVwcb2,NVwcb2);assign JVwcb2=NVwcb2;cWwcb2 dWwcb2(i_clk,
-KVwcb2,OVwcb2,FVwcb2,HVwcb2,GVwcb2,PVwcb2,XVwcb2,QVwcb2,VVwcb2);assign VVwcb2=
-RVwcb2;eWwcb2 fWwcb2(i_clk,PVwcb2,XVwcb2,RVwcb2,YVwcb2,LVwcb2);gWwcb2 hWwcb2(
-i_clk,RVwcb2,YVwcb2,UVwcb2,SVwcb2,ZVwcb2,LVwcb2);iWwcb2 jWwcb2(i_clk,SVwcb2,
-ZVwcb2,TVwcb2,aWwcb2,(FVwcb2||HVwcb2||MVwcb2||QVwcb2),WVwcb2,UVwcb2);kWwcb2
-lWwcb2(i_clk,TVwcb2,aWwcb2,eVwcb2,IVwcb2,WVwcb2,i_tx_busy);endmodule module
-mWwcb2(i_clk,cVwcb2,nWwcb2,eVwcb2,oWwcb2,pWwcb2);input i_clk,cVwcb2;input[7:0]
-nWwcb2;output reg eVwcb2,oWwcb2;output reg[5:0]pWwcb2;always@(posedge i_clk)
-eVwcb2<=cVwcb2;always@(posedge i_clk)begin oWwcb2<=1'd1;pWwcb2<=6'd0;if((nWwcb2
->=8'd48)&&(nWwcb2<=8'd57))pWwcb2<={2'd0,nWwcb2[3:0]};else if((nWwcb2>=8'd65)&&
-(nWwcb2<=8'd90))pWwcb2<=(nWwcb2[5:0]-6'd1+6'd10);else if((nWwcb2>=8'd97)&&(
-nWwcb2<=8'd122))pWwcb2<=(nWwcb2[5:0]+6'd3);else if(nWwcb2==8'd64)pWwcb2<=6'd62
-;else if(nWwcb2==8'd37)pWwcb2<=6'd63;else oWwcb2<=1'd0;end endmodule module
-iWwcb2(i_clk,cVwcb2,qWwcb2,eVwcb2,rWwcb2,HVwcb2,i_tx_busy,sWwcb2);input i_clk,
-cVwcb2;input[6:0]qWwcb2;output reg eVwcb2;output reg[6:0]rWwcb2;input HVwcb2;
-input i_tx_busy;output wire sWwcb2;reg tWwcb2,uWwcb2;initial tWwcb2=1'd1;
-initial uWwcb2=1'd1;always@(posedge i_clk)if((~i_tx_busy)&&(eVwcb2))tWwcb2<=(
-rWwcb2[6]);always@(posedge i_clk)if((cVwcb2)&&(~sWwcb2))uWwcb2<=(qWwcb2[6]);reg
-[6:0]vWwcb2;initial vWwcb2=7'd0;always@(posedge i_clk)if((~i_tx_busy)&&(eVwcb2
-))begin if(rWwcb2[6])vWwcb2<=0;else vWwcb2<=vWwcb2+7'd1;end reg wWwcb2;initial
-wWwcb2=1'd0;always@(posedge i_clk)wWwcb2<=(vWwcb2>7'd72);initial eVwcb2=1'd0;
-always@(posedge i_clk)if((cVwcb2)&&(~sWwcb2))begin eVwcb2<=(wWwcb2)||(~qWwcb2[6
-]);rWwcb2<=qWwcb2;end else if(~sWwcb2)begin eVwcb2<=(~i_tx_busy)&&(~HVwcb2)&&(
-~tWwcb2)&&(uWwcb2);rWwcb2<=7'd64;end else if(~i_tx_busy)eVwcb2<=1'd0;reg xWwcb2
-;initial xWwcb2=1'd0;always@(posedge i_clk)xWwcb2<=(eVwcb2);assign sWwcb2=(
-xWwcb2)||(eVwcb2);endmodule module gWwcb2(i_clk,cVwcb2,dVwcb2,i_tx_busy,eVwcb2
-,rWwcb2,sWwcb2);input i_clk,cVwcb2;input[35:0]dVwcb2;input i_tx_busy;output reg
-eVwcb2;output reg[6:0]rWwcb2;output reg sWwcb2;wire[2:0]yWwcb2;assign yWwcb2=(
-dVwcb2[35:33]==3'd0)?3'd1:(dVwcb2[35:32]==4'd2)?3'd6:(dVwcb2[35:32]==4'd3)?(
-3'd2+{1'd0,dVwcb2[31:30]}):(dVwcb2[35:34]==2'd1)?3'd2:(dVwcb2[35:34]==2'd2)?
-3'd1:3'd6;reg zWwcb2;reg[2:0]AWwcb2;reg[29:0]jVwcb2;initial eVwcb2=1'd0;initial
-sWwcb2=1'd0;initial zWwcb2=1'd0;always@(posedge i_clk)if((cVwcb2)&&(~sWwcb2))
-begin AWwcb2<=yWwcb2-3'd1;jVwcb2<=dVwcb2[29:0];eVwcb2<=1'd1;rWwcb2<={1'd0,
-dVwcb2[35:30]};sWwcb2<=1'd1;zWwcb2<=1'd1;end else if((eVwcb2)&&(i_tx_busy))
-begin sWwcb2<=1'd1;zWwcb2<=1'd1;end else if(eVwcb2)eVwcb2<=1'd0;else if(AWwcb2
->0)begin eVwcb2<=1'd1;rWwcb2<={1'd0,jVwcb2[29:24]};jVwcb2[29:6]<=jVwcb2[23:0];
-AWwcb2<=AWwcb2-3'd1;sWwcb2<=1'd1;zWwcb2<=1'd1;end else if(~rWwcb2[6])begin
-eVwcb2<=1'd1;rWwcb2<=7'd64;sWwcb2<=1'd1;zWwcb2<=1'd1;end else begin zWwcb2<=
-1'd0;sWwcb2<=(zWwcb2);end endmodule module cWwcb2(i_clk,cVwcb2,EVwcb2,BWwcb2,
-CWwcb2,GVwcb2,eVwcb2,DWwcb2,sWwcb2,i_tx_busy);input i_clk;input cVwcb2;input[35
-:0]EVwcb2;input BWwcb2,CWwcb2,GVwcb2;output reg eVwcb2;output reg[35:0]DWwcb2;
-output reg sWwcb2;input i_tx_busy;reg EWwcb2,FWwcb2;initial EWwcb2=1'd0;always
-@(posedge i_clk)if((eVwcb2)&&(~i_tx_busy)&&(DWwcb2[35:30]==6'd4))EWwcb2<=GVwcb2
-;else EWwcb2<=(EWwcb2)||(GVwcb2);wire GWwcb2;reg HWwcb2;reg[35:0]IWwcb2;initial
-IWwcb2=36'd0;always@(posedge i_clk)if((cVwcb2)||(eVwcb2))IWwcb2<=36'd0;else if
-(~IWwcb2[35])IWwcb2<=IWwcb2+36'd43;initial HWwcb2=1'd0;always@(posedge i_clk)if
-((eVwcb2)&&(~i_tx_busy)&&(DWwcb2[35:31]==5'd0))HWwcb2<=1'd1;else if(~IWwcb2[35
-])HWwcb2<=1'd0;assign GWwcb2=(~HWwcb2)&&(IWwcb2[35]);initial eVwcb2=1'd0;
-initial sWwcb2=1'd0;always@(posedge i_clk)if((eVwcb2)&&(i_tx_busy))begin sWwcb2
-<=1'd1;end else if(eVwcb2)begin eVwcb2<=1'd0;sWwcb2<=1'd1;end else if(sWwcb2)
-sWwcb2<=1'd0;else if(cVwcb2)begin DWwcb2<=EVwcb2;eVwcb2<=1'd1;sWwcb2<=1'd1;end
-else if((EWwcb2)&&(~FWwcb2))begin eVwcb2<=1'd1;DWwcb2<={6'd4,30'd0};sWwcb2<=
-1'd1;end else if(GWwcb2)begin eVwcb2<=1'd1;sWwcb2<=1'd1;if(BWwcb2)DWwcb2<={6'd1
-,30'd0};else DWwcb2<={6'd0,30'd0};end initial FWwcb2=1'd0;always@(posedge i_clk
-)if((EWwcb2)&&((~eVwcb2)&&(~sWwcb2)&&(~cVwcb2)))FWwcb2<=1'd1;else if(~GVwcb2)
-FWwcb2<=1'd0;endmodule module JWwcb2(i_clk,cVwcb2,KWwcb2,LWwcb2,eVwcb2,DWwcb2)
-;input i_clk,cVwcb2,KWwcb2;input[5:0]LWwcb2;output reg eVwcb2;output reg[35:0]
-DWwcb2;reg[2:0]AWwcb2,MWwcb2;wire NWwcb2;assign NWwcb2=((AWwcb2==MWwcb2)&&(
-MWwcb2!=0))||((cVwcb2)&&(~KWwcb2)&&(OWwcb2==2'd1));initial AWwcb2=3'd0;always@
-(posedge i_clk)if((cVwcb2)&&(~KWwcb2))AWwcb2<=0;else if(NWwcb2)AWwcb2<=(cVwcb2
-)?3'd1:3'd0;else if(cVwcb2)AWwcb2<=AWwcb2+3'd1;reg[35:0]PWwcb2;always@(posedge
-i_clk)if(NWwcb2)PWwcb2[35:30]<=LWwcb2;else if(cVwcb2)case(AWwcb2)3'd0:PWwcb2[35
-:30]<=LWwcb2;3'd1:PWwcb2[29:24]<=LWwcb2;3'd2:PWwcb2[23:18]<=LWwcb2;3'd3:PWwcb2
-[17:12]<=LWwcb2;3'd4:PWwcb2[11:6]<=LWwcb2;3'd5:PWwcb2[5:0]<=LWwcb2;default:
-begin end endcase reg[1:0]OWwcb2;always@(posedge i_clk)if(eVwcb2)OWwcb2<=DWwcb2
-[35:34];always@(posedge i_clk)if((cVwcb2)&&(~KWwcb2)&&(OWwcb2==2'd1))DWwcb2[35
-:30]<=6'd46;else DWwcb2<=PWwcb2;initial MWwcb2=3'd0;always@(posedge i_clk)if((
-cVwcb2)&&(~KWwcb2))MWwcb2<=0;else if((cVwcb2)&&((MWwcb2==0)||(NWwcb2)))begin if
-(LWwcb2[5:4]==2'd3)MWwcb2<=3'd2;else if(LWwcb2[5:4]==2'd2)MWwcb2<=3'd1;else if
-(LWwcb2[5:3]==3'd2)MWwcb2<=3'd2;else if(LWwcb2[5:3]==3'd1)MWwcb2<=3'd2+{1'd0,
-LWwcb2[2:1]};else MWwcb2<=3'd6;end else if(NWwcb2)MWwcb2<=0;always@(posedge
-i_clk)eVwcb2<=NWwcb2;endmodule module eWwcb2(i_clk,cVwcb2,EVwcb2,eVwcb2,QWwcb2
-,CWwcb2);parameter DW=32,CW=36,TBITS=10;input i_clk,cVwcb2;input[(CW-1):0]
-EVwcb2;output wire eVwcb2;output wire[(CW-1):0]QWwcb2;input CWwcb2;reg RWwcb2;
-reg[35:0]SWwcb2;wire[31:0]mVwcb2;assign mVwcb2=EVwcb2[31:0];always@(posedge
-i_clk)if((cVwcb2)&&(~RWwcb2))begin if(EVwcb2[35:32]!=4'd2)begin SWwcb2<=EVwcb2
-;end else if(mVwcb2[31:6]==26'd0)SWwcb2<={6'd12,mVwcb2[5:0],24'd0};else if(
-mVwcb2[31:12]==20'd0)SWwcb2<={6'd13,mVwcb2[11:0],18'd0};else if(mVwcb2[31:18]
-==14'd0)SWwcb2<={6'd14,mVwcb2[17:0],12'd0};else if(mVwcb2[31:24]==8'd0)SWwcb2
-<={6'd15,mVwcb2[23:0],6'd0};else begin SWwcb2<=EVwcb2;end end initial RWwcb2=
-1'd0;always@(posedge i_clk)if((cVwcb2)&&(~RWwcb2))RWwcb2<=cVwcb2;else if(~
-CWwcb2)RWwcb2<=1'd0;wire TWwcb2;assign TWwcb2=(RWwcb2)&&(~CWwcb2);reg pVwcb2;
-always@(posedge i_clk)pVwcb2<=RWwcb2;wire[35:0]jVwcb2;assign jVwcb2=SWwcb2;reg
-[(TBITS-1):0]UWwcb2;reg VWwcb2,WWwcb2;always@(posedge i_clk)if(TWwcb2)begin if
-(QWwcb2[35:33]==3'd1)UWwcb2<=0;else if(QWwcb2[35:33]==3'd7)UWwcb2<=UWwcb2+{{(
-TBITS-1){1'd0}},1'd1};end always@(posedge i_clk)if((TWwcb2)&&(QWwcb2[35:33]==
-3'd1))WWwcb2<=1'd0;else if(UWwcb2==10'd1023)WWwcb2<=1'd1;reg[31:0]iVwcb2[0:((1
-<<TBITS)-1)];always@(posedge i_clk)iVwcb2[UWwcb2]<={jVwcb2[32:31],jVwcb2[29:0]
-};reg XWwcb2,YWwcb2;reg[(TBITS-1):0]ZWwcb2;reg[(TBITS-1):0]aXwcb2;initial
-ZWwcb2=0;initial XWwcb2=0;always@(posedge i_clk)begin YWwcb2<=((aXwcb2-UWwcb2)
-=={{(TBITS-1){1'd0}},1'd1});if((TWwcb2)||(~RWwcb2))begin ZWwcb2<=UWwcb2+{(TBITS
-){1'd1}};aXwcb2=UWwcb2+{{(TBITS-1){1'd1}},1'd0};XWwcb2<=1'd0;end else if((~
-XWwcb2)&&(~bXwcb2)&&((~aXwcb2[TBITS-1])||(WWwcb2)))begin ZWwcb2<=aXwcb2;aXwcb2
-=aXwcb2-{{(TBITS-1){1'd0}},1'd1};XWwcb2<=YWwcb2;end end reg[1:0]cXwcb2;reg
-dXwcb2,eXwcb2;reg[(DW-1):0]oVwcb2;reg[(TBITS-1):0]fXwcb2,gXwcb2,hXwcb2;always@
-(posedge i_clk)begin oVwcb2<=iVwcb2[ZWwcb2];fXwcb2<=ZWwcb2;dXwcb2<=(oVwcb2=={
-jVwcb2[32:31],jVwcb2[29:0]});gXwcb2<=fXwcb2;hXwcb2<=UWwcb2-fXwcb2;eXwcb2<=({
-1'd0,fXwcb2}<{WWwcb2,UWwcb2})&&(fXwcb2!=UWwcb2);end always@(posedge i_clk)if((
-TWwcb2)||(~RWwcb2))cXwcb2<=0;else cXwcb2<={cXwcb2[0],1'd1};reg bXwcb2;reg[9:0]
-iXwcb2;always@(posedge i_clk)if((TWwcb2)||(~RWwcb2)||(~pVwcb2))bXwcb2<=1'd0;
-else if(~bXwcb2)begin bXwcb2<=(eXwcb2)&&(dXwcb2)&&(jVwcb2[35:33]==3'd7)&&(
-cXwcb2==2'd3);end reg jXwcb2,kXwcb2,lXwcb2;always@(posedge i_clk)if(~bXwcb2)
-begin iXwcb2<=hXwcb2;lXwcb2<=(hXwcb2<10'd1313);jXwcb2<=(hXwcb2==10'd1);kXwcb2
-<=(hXwcb2<10'd10);end wire[(TBITS-1):0]mXwcb2;wire[9:0]nXwcb2;wire[2:0]oXwcb2;
-assign mXwcb2=iXwcb2;assign oXwcb2=iXwcb2[2:0]-3'd2;assign nXwcb2=iXwcb2-10'd10
-;initial VWwcb2=1'd0;reg[(CW-1):0]pXwcb2;always@(posedge i_clk)begin if((~
-RWwcb2)||(~pVwcb2)||(TWwcb2))begin pXwcb2<=jVwcb2;VWwcb2<=1'd0;end else if((
-bXwcb2)&&(lXwcb2))begin pXwcb2<=jVwcb2;if(jXwcb2)pXwcb2[35:30]<={5'd3,jVwcb2[30
-]};else if(kXwcb2)pXwcb2[35:30]<={2'd2,oXwcb2,jVwcb2[30]};else pXwcb2[35:24]<=
-{2'd1,nXwcb2[8:6],jVwcb2[30],nXwcb2[5:0]};end else pXwcb2<=jVwcb2;end assign
-eVwcb2=RWwcb2;assign QWwcb2=(pVwcb2)?(pXwcb2):(SWwcb2);endmodule module VUwcb2
-(i_clk,qVwcb2,cVwcb2,EVwcb2,sWwcb2,o_wb_cyc,o_wb_stb,o_wb_we,o_wb_addr,
-o_wb_data,i_wb_ack,i_wb_stall,i_wb_err,i_wb_data,eVwcb2,DWwcb2);input i_clk,
-qVwcb2;input cVwcb2;input[35:0]EVwcb2;output wire sWwcb2;output reg o_wb_cyc;
-output reg o_wb_stb;output reg o_wb_we;output reg[31:0]o_wb_addr,o_wb_data;
-input i_wb_ack,i_wb_stall,i_wb_err;input[31:0]i_wb_data;output reg eVwcb2;
-output reg[35:0]DWwcb2;wire qXwcb2,rXwcb2,sXwcb2,tXwcb2;assign qXwcb2=(cVwcb2)
-&&(~sWwcb2);assign sXwcb2=(qXwcb2)&&(EVwcb2[35:34]==2'd1);assign rXwcb2=(qXwcb2
-)&&(EVwcb2[35:30]==6'd46);wire[31:0]uXwcb2;assign uXwcb2={EVwcb2[32:31],EVwcb2
-[29:0]};assign tXwcb2=((qXwcb2)&&(EVwcb2[35:33]!=3'd3)&&(EVwcb2[35:30]!=6'd46)
-);reg[2:0]vXwcb2;reg[9:0]wXwcb2,AWwcb2;reg xXwcb2,yXwcb2,zXwcb2,AXwcb2,BXwcb2;
-reg CXwcb2;initial yXwcb2=1'd1;initial vXwcb2=3'd0;initial eVwcb2=1'd0;always@
-(posedge i_clk)if(qVwcb2)begin vXwcb2<=3'd0;eVwcb2<=1'd1;DWwcb2<={6'd3,
-i_wb_data[29:0]};o_wb_cyc<=1'd0;o_wb_stb<=1'd0;end else case(vXwcb2)3'd0:begin
-o_wb_cyc<=1'd0;o_wb_stb<=1'd0;eVwcb2<=1'd0;xXwcb2<=EVwcb2[30];o_wb_we<=(~EVwcb2
-[35]);DWwcb2<={4'd2,o_wb_addr};o_wb_we<=(EVwcb2[35:34]!=2'd3);o_wb_data<=uXwcb2
-;if(cVwcb2)begin casez(EVwcb2[35:32])4'd0:begin o_wb_addr<=EVwcb2[31:0];end
-4'b001?:begin o_wb_addr<=o_wb_addr+{EVwcb2[32:31],EVwcb2[29:0]};end 4'b01??:
-begin vXwcb2<=3'd2;o_wb_cyc<=1'd1;o_wb_stb<=1'd1;end 4'b11??:begin if(yXwcb2)
-eVwcb2<=1'd1;vXwcb2<=3'd1;o_wb_cyc<=1'd1;o_wb_stb<=1'd1;end default:;endcase
-end end 3'd1:begin o_wb_cyc<=1'd1;o_wb_stb<=1'd1;if(i_wb_err)vXwcb2<=3'd0;
-eVwcb2<=(i_wb_err)||(i_wb_ack);if(i_wb_err)DWwcb2<={6'd5,i_wb_data[29:0]};else
-DWwcb2<={3'd7,i_wb_data[31:30],xXwcb2,i_wb_data[29:0]};if((xXwcb2)&&(~
-i_wb_stall))o_wb_addr<=o_wb_addr+32'd1;if(~i_wb_stall)begin if((CXwcb2)||(
-zXwcb2))begin vXwcb2<=3'd3;o_wb_stb<=1'd0;end end end 3'd2:begin o_wb_cyc<=1'd1
-;o_wb_stb<=1'd1;if(i_wb_err)DWwcb2<={6'd5,i_wb_data[29:0]};else DWwcb2<={6'd2,
-i_wb_data[29:0]};if((xXwcb2)&&(~i_wb_stall))o_wb_addr<=o_wb_addr+32'd1;eVwcb2
-<=1'd1;if(i_wb_err)begin vXwcb2<=3'd5;o_wb_cyc<=1'd0;o_wb_stb<=1'd0;end else if
-(~i_wb_stall)begin vXwcb2<=3'd4;o_wb_stb<=1'd0;end end 3'd3:begin o_wb_cyc<=
-1'd1;o_wb_stb<=1'd0;if(i_wb_err)DWwcb2<={6'd5,i_wb_data[29:0]};else DWwcb2<={
-3'd7,i_wb_data[31:30],xXwcb2,i_wb_data[29:0]};eVwcb2<=(((i_wb_ack)&&(~o_wb_we)
-)||(i_wb_err));if(((AXwcb2)&&(i_wb_ack))||(BXwcb2)||(i_wb_err))begin o_wb_cyc
-<=1'd0;vXwcb2<=3'd0;end end 3'd4:begin DWwcb2<={6'd5,i_wb_data[29:0]};eVwcb2<=
-(i_wb_err)||(tXwcb2);o_wb_data<=uXwcb2;o_wb_cyc<=1'd1;o_wb_stb<=1'd0;if(tXwcb2
-)begin o_wb_cyc<=1'd0;vXwcb2<=3'd0;end else if(i_wb_err)begin o_wb_cyc<=1'd0;
-vXwcb2<=3'd5;end else if(sXwcb2)begin vXwcb2<=3'd2;o_wb_stb<=1'd1;end else if(
-rXwcb2)vXwcb2<=3'd3;end 3'd5:begin o_wb_cyc<=1'd0;o_wb_stb<=1'd0;DWwcb2<={6'd5
-,i_wb_data[29:0]};eVwcb2<=(tXwcb2);if((rXwcb2)||(tXwcb2))vXwcb2<=3'd0;end
-default:begin eVwcb2<=1'd1;DWwcb2<={6'd3,i_wb_data[29:0]};vXwcb2<=3'd0;o_wb_cyc
-<=1'd0;o_wb_stb<=1'd0;end endcase assign sWwcb2=(vXwcb2!=3'd0)&&(vXwcb2!=3'd4)
-&&(vXwcb2!=3'd5);always@(posedge i_clk)if(qVwcb2)yXwcb2<=1'd1;else if((~
-o_wb_cyc)&&(cVwcb2)&&(~EVwcb2[35]))yXwcb2<=1'd1;else if(o_wb_cyc)yXwcb2<=1'd0;
-always@(posedge i_clk)if(~o_wb_cyc)wXwcb2<=10'd0;else if((o_wb_stb)&&(~
-i_wb_stall)&&(~i_wb_ack))wXwcb2<=wXwcb2+10'd1;else if(((~o_wb_stb)||(i_wb_stall
-))&&(i_wb_ack))wXwcb2<=wXwcb2-10'd1;always@(posedge i_clk)AXwcb2<=(~o_wb_stb)
-&&(wXwcb2==10'd1)||(o_wb_stb)&&(wXwcb2==10'd0);always@(posedge i_clk)BXwcb2<=(
-~o_wb_stb)&&(wXwcb2==10'd0);always@(posedge i_clk)if(~o_wb_cyc)AWwcb2<=EVwcb2[9
-:0];else if((o_wb_stb)&&(~i_wb_stall)&&(|AWwcb2))AWwcb2<=AWwcb2-10'd1;always@(
-posedge i_clk)begin CXwcb2<=(~o_wb_cyc)&&(EVwcb2[9:0]==10'd1);zXwcb2<=(o_wb_stb
-)&&(AWwcb2[9:2]==8'd0)&&((~AWwcb2[1])||((~AWwcb2[0])&&(~i_wb_stall)));end
-endmodule module JUwcb2(i_clk,cVwcb2,nWwcb2,eVwcb2,DWwcb2);input i_clk,cVwcb2;
-input[7:0]nWwcb2;output wire eVwcb2;output wire[35:0]DWwcb2;wire DXwcb2,EXwcb2
-;wire[5:0]FXwcb2;mWwcb2 GXwcb2(i_clk,cVwcb2,nWwcb2,DXwcb2,EXwcb2,FXwcb2);wire
-PVwcb2;wire[35:0]HXwcb2;JWwcb2 IXwcb2(i_clk,DXwcb2,EXwcb2,FXwcb2,PVwcb2,HXwcb2
-);bVwcb2 JXwcb2(i_clk,PVwcb2,HXwcb2,eVwcb2,DWwcb2);endmodule module kWwcb2(
-i_clk,cVwcb2,KXwcb2,eVwcb2,IVwcb2,sWwcb2,CWwcb2);input i_clk;input cVwcb2;input
-[6:0]KXwcb2;output reg eVwcb2;output reg[7:0]IVwcb2;output wire sWwcb2;input
-CWwcb2;initial IVwcb2=8'd0;always@(posedge i_clk)if((cVwcb2)&&(~sWwcb2))begin
-if(KXwcb2[6])IVwcb2<=8'd10;else if(KXwcb2[5:0]<=6'd9)IVwcb2<=8'd48+{4'd0,KXwcb2
-[3:0]};else if(KXwcb2[5:0]<=6'd35)IVwcb2<=8'd65+{2'd0,KXwcb2[5:0]}-8'd10;else
-if(KXwcb2[5:0]<=6'd61)IVwcb2<=8'd97+{2'd0,KXwcb2[5:0]}-8'd36;else if(KXwcb2[5:0
-]==6'd62)IVwcb2<=8'd64;else IVwcb2<=8'd37;end always@(posedge i_clk)if((eVwcb2
-)&&(~CWwcb2))eVwcb2<=1'd0;else if((cVwcb2)&&(~eVwcb2))eVwcb2<=1'd1;assign
-sWwcb2=eVwcb2;endmodule
+neVMD2,qeVMD2);wire xeVMD2;yeVMD2 zeVMD2(i_clk,oeVMD2,neVMD2,qeVMD2,o_wb_cyc,
+i_interrupt,neVMD2,o_tx_stb,o_tx_data,i_tx_busy,xeVMD2);reg[(LGWATCHDOG-1):0]
+AeVMD2;initial geVMD2=1'd0;initial AeVMD2=0;always@(posedge i_clk)if((~o_wb_cyc
+)||(i_wb_ack))begin AeVMD2<=0;geVMD2<=1'd0;end else if(&AeVMD2)begin geVMD2<=
+1'd1;AeVMD2<=0;end else begin AeVMD2<=AeVMD2+{{(LGWATCHDOG-1){1'd0}},1'd1};
+geVMD2<=1'd0;end assign o_dbg=oeVMD2;endmodule module BeVMD2(i_clk,CeVMD2,
+DeVMD2,EeVMD2,FeVMD2);input i_clk,CeVMD2;input[35:0]DeVMD2;output reg EeVMD2;
+output reg[35:0]FeVMD2;wire GeVMD2=(DeVMD2[35:33]==3'd3);reg[7:0]HeVMD2;initial
+HeVMD2=8'd0;always@(posedge i_clk)if((CeVMD2)&&(GeVMD2))HeVMD2<=HeVMD2+8'd1;reg
+[31:0]IeVMD2[0:255];always@(posedge i_clk)if(CeVMD2)IeVMD2[HeVMD2]<={DeVMD2[32
+:31],DeVMD2[29:0]};reg[35:0]JeVMD2;always@(posedge i_clk)if(CeVMD2)JeVMD2<=
+DeVMD2;reg[7:0]KeVMD2;always@(posedge i_clk)KeVMD2=HeVMD2-{JeVMD2[32:31],JeVMD2
+[29:24]};reg[24:0]LeVMD2;always@(posedge i_clk)case(JeVMD2[32:30])3'd0:LeVMD2
+<={19'd0,JeVMD2[29:24]};3'd2:LeVMD2<={13'd0,JeVMD2[29:18]};3'd4:LeVMD2<={7'd0,
+JeVMD2[29:12]};3'd6:LeVMD2<={1'd0,JeVMD2[29:6]};3'd1:LeVMD2<={{(19){JeVMD2[29]
+}},JeVMD2[29:24]};3'd3:LeVMD2<={{(13){JeVMD2[29]}},JeVMD2[29:18]};3'd5:LeVMD2
+<={{(7){JeVMD2[29]}},JeVMD2[29:12]};3'd7:LeVMD2<={{(1){JeVMD2[29]}},JeVMD2[29:6
+]};endcase wire[31:0]MeVMD2;assign MeVMD2={{(7){LeVMD2[24]}},LeVMD2};reg[9:0]
+NeVMD2;always@(posedge i_clk)if(~JeVMD2[34])NeVMD2<=10'd1+{6'd0,JeVMD2[33:31]}
+;else NeVMD2<=10'd9+{1'd0,JeVMD2[33:31],JeVMD2[29:24]};reg[31:0]OeVMD2;always@
+(posedge i_clk)OeVMD2<=IeVMD2[KeVMD2];reg[2:0]PeVMD2;initial PeVMD2=0;always@(
+posedge i_clk)PeVMD2<={PeVMD2[1:0],CeVMD2};always@(posedge i_clk)EeVMD2<=PeVMD2
+[2];always@(posedge i_clk)if(JeVMD2[35:30]==6'd46)FeVMD2<=JeVMD2;else casez(
+JeVMD2[35:30])6'b001??0:FeVMD2<={4'd0,MeVMD2[31:0]};6'b001??1:FeVMD2<={3'd1,
+MeVMD2[31:30],1'd1,MeVMD2[29:0]};6'b010???:FeVMD2<={3'd3,OeVMD2[31:30],JeVMD2[
+30],OeVMD2[29:0]};6'b10????:FeVMD2<={5'd24,JeVMD2[30],20'd0,NeVMD2};6'b11????:
+FeVMD2<={5'd24,JeVMD2[30],20'd0,NeVMD2};default:FeVMD2<=JeVMD2;endcase
+endmodule module teVMD2(i_clk,QeVMD2,ReVMD2,SeVMD2,TeVMD2,UeVMD2,VeVMD2,WeVMD2
+);parameter BW=66,LGFLEN=10;input i_clk,QeVMD2;input ReVMD2;input[(BW-1):0]
+SeVMD2;input TeVMD2;output reg[(BW-1):0]UeVMD2;output reg VeVMD2;output wire
+WeVMD2;localparam XeVMD2=(1<<LGFLEN);reg[(BW-1):0]YeVMD2[0:(XeVMD2-1)];reg[(
+LGFLEN-1):0]ZeVMD2,afVMD2;reg bfVMD2;initial bfVMD2=1'd0;always@(posedge i_clk
+)if(QeVMD2)bfVMD2<=1'd0;else if(TeVMD2)bfVMD2<=(bfVMD2)&&(ReVMD2);else if(
+ReVMD2)bfVMD2<=(ZeVMD2+2==afVMD2);else if(ZeVMD2+1==afVMD2)bfVMD2<=1'd1;initial
+ZeVMD2=0;always@(posedge i_clk)if(QeVMD2)ZeVMD2<={(LGFLEN){1'd0}};else if(
+ReVMD2)begin if((TeVMD2)||(~bfVMD2))ZeVMD2<=ZeVMD2+{{(LGFLEN-1){1'd0}},1'd1};
+end always@(posedge i_clk)if(ReVMD2)YeVMD2[ZeVMD2]<=SeVMD2;reg cfVMD2;initial
+cfVMD2=1'd0;always@(posedge i_clk)if(QeVMD2)cfVMD2<=1'd0;else if(ReVMD2)cfVMD2
+<=(cfVMD2)&&(TeVMD2);else if(TeVMD2)cfVMD2<=(afVMD2+1==ZeVMD2);else cfVMD2<=(
+afVMD2==ZeVMD2);initial afVMD2=0;always@(posedge i_clk)if(QeVMD2)afVMD2<={(
+LGFLEN){1'd0}};else if(TeVMD2)begin if((ReVMD2)||(~cfVMD2))afVMD2<=afVMD2+{{(
+LGFLEN-1){1'd0}},1'd1};end always@(posedge i_clk)UeVMD2<=YeVMD2[(TeVMD2)?(
+afVMD2+{{(LGFLEN-1){1'd0}},1'd1}):(afVMD2)];wire[(LGFLEN-1):0]dfVMD2;assign
+dfVMD2=ZeVMD2+{{(LGFLEN-1){1'd0}},1'd1};assign WeVMD2=((ReVMD2)&&(bfVMD2)&&(~
+TeVMD2))||((TeVMD2)&&(cfVMD2)&&(~ReVMD2));wire[(LGFLEN-1):0]efVMD2;assign
+efVMD2=afVMD2+{{(LGFLEN-1){1'd0}},1'd1};always@(posedge i_clk)if(QeVMD2)VeVMD2
+<=1'd0;else VeVMD2<=(~TeVMD2)&&(ZeVMD2!=afVMD2)||(TeVMD2)&&(ZeVMD2!=efVMD2);
+endmodule module yeVMD2(i_clk,QeVMD2,CeVMD2,ffVMD2,gfVMD2,hfVMD2,ifVMD2,EeVMD2
+,jfVMD2,i_tx_busy,kfVMD2);input i_clk,QeVMD2;input CeVMD2;input[35:0]ffVMD2;
+input gfVMD2,hfVMD2,ifVMD2;output wire EeVMD2;output wire[7:0]jfVMD2;input
+i_tx_busy;output wire kfVMD2;wire lfVMD2,mfVMD2,nfVMD2,ofVMD2;wire[35:0]pfVMD2
+;wire qfVMD2,rfVMD2,sfVMD2,tfVMD2,ufVMD2,vfVMD2,wfVMD2,xfVMD2;wire[35:0]yfVMD2
+,zfVMD2;wire[6:0]AfVMD2,BfVMD2;assign lfVMD2=(nfVMD2)&&(~rfVMD2);teVMD2#(36,10
+)CfVMD2(i_clk,QeVMD2,CeVMD2,ffVMD2,lfVMD2,pfVMD2,nfVMD2,ofVMD2);assign kfVMD2=
+ofVMD2;DfVMD2 EfVMD2(i_clk,lfVMD2,pfVMD2,gfVMD2,ifVMD2,hfVMD2,qfVMD2,yfVMD2,
+rfVMD2,wfVMD2);assign wfVMD2=sfVMD2;FfVMD2 GfVMD2(i_clk,qfVMD2,yfVMD2,sfVMD2,
+zfVMD2,mfVMD2);HfVMD2 IfVMD2(i_clk,sfVMD2,zfVMD2,vfVMD2,tfVMD2,AfVMD2,mfVMD2);
+JfVMD2 KfVMD2(i_clk,tfVMD2,AfVMD2,ufVMD2,BfVMD2,(gfVMD2||ifVMD2||nfVMD2||rfVMD2
+),xfVMD2,vfVMD2);LfVMD2 MfVMD2(i_clk,ufVMD2,BfVMD2,EeVMD2,jfVMD2,xfVMD2,
+i_tx_busy);endmodule module NfVMD2(i_clk,CeVMD2,OfVMD2,EeVMD2,PfVMD2,QfVMD2);
+input i_clk,CeVMD2;input[7:0]OfVMD2;output reg EeVMD2,PfVMD2;output reg[5:0]
+QfVMD2;always@(posedge i_clk)EeVMD2<=CeVMD2;always@(posedge i_clk)begin PfVMD2
+<=1'd1;QfVMD2<=6'd0;if((OfVMD2>=8'd48)&&(OfVMD2<=8'd57))QfVMD2<={2'd0,OfVMD2[3
+:0]};else if((OfVMD2>=8'd65)&&(OfVMD2<=8'd90))QfVMD2<=(OfVMD2[5:0]-6'd1+6'd10)
+;else if((OfVMD2>=8'd97)&&(OfVMD2<=8'd122))QfVMD2<=(OfVMD2[5:0]+6'd3);else if(
+OfVMD2==8'd64)QfVMD2<=6'd62;else if(OfVMD2==8'd37)QfVMD2<=6'd63;else PfVMD2<=
+1'd0;end endmodule module JfVMD2(i_clk,CeVMD2,RfVMD2,EeVMD2,SfVMD2,ifVMD2,
+i_tx_busy,TfVMD2);input i_clk,CeVMD2;input[6:0]RfVMD2;output reg EeVMD2;output
+reg[6:0]SfVMD2;input ifVMD2;input i_tx_busy;output wire TfVMD2;reg UfVMD2,
+VfVMD2;initial UfVMD2=1'd1;initial VfVMD2=1'd1;always@(posedge i_clk)if((~
+i_tx_busy)&&(EeVMD2))UfVMD2<=(SfVMD2[6]);always@(posedge i_clk)if((CeVMD2)&&(~
+TfVMD2))VfVMD2<=(RfVMD2[6]);reg[6:0]WfVMD2;initial WfVMD2=7'd0;always@(posedge
+i_clk)if((~i_tx_busy)&&(EeVMD2))begin if(SfVMD2[6])WfVMD2<=0;else WfVMD2<=
+WfVMD2+7'd1;end reg XfVMD2;initial XfVMD2=1'd0;always@(posedge i_clk)XfVMD2<=(
+WfVMD2>7'd72);initial EeVMD2=1'd0;always@(posedge i_clk)if((CeVMD2)&&(~TfVMD2)
+)begin EeVMD2<=(XfVMD2)||(~RfVMD2[6]);SfVMD2<=RfVMD2;end else if(~TfVMD2)begin
+EeVMD2<=(~i_tx_busy)&&(~ifVMD2)&&(~UfVMD2)&&(VfVMD2);SfVMD2<=7'd64;end else if
+(~i_tx_busy)EeVMD2<=1'd0;reg YfVMD2;initial YfVMD2=1'd0;always@(posedge i_clk)
+YfVMD2<=(EeVMD2);assign TfVMD2=(YfVMD2)||(EeVMD2);endmodule module HfVMD2(i_clk
+,CeVMD2,DeVMD2,i_tx_busy,EeVMD2,SfVMD2,TfVMD2);input i_clk,CeVMD2;input[35:0]
+DeVMD2;input i_tx_busy;output reg EeVMD2;output reg[6:0]SfVMD2;output reg
+TfVMD2;wire[2:0]ZfVMD2;assign ZfVMD2=(DeVMD2[35:33]==3'd0)?3'd1:(DeVMD2[35:32]
+==4'd2)?3'd6:(DeVMD2[35:32]==4'd3)?(3'd2+{1'd0,DeVMD2[31:30]}):(DeVMD2[35:34]
+==2'd1)?3'd2:(DeVMD2[35:34]==2'd2)?3'd1:3'd6;reg agVMD2;reg[2:0]bgVMD2;reg[29:0
+]JeVMD2;initial EeVMD2=1'd0;initial TfVMD2=1'd0;initial agVMD2=1'd0;always@(
+posedge i_clk)if((CeVMD2)&&(~TfVMD2))begin bgVMD2<=ZfVMD2-3'd1;JeVMD2<=DeVMD2[
+29:0];EeVMD2<=1'd1;SfVMD2<={1'd0,DeVMD2[35:30]};TfVMD2<=1'd1;agVMD2<=1'd1;end
+else if((EeVMD2)&&(i_tx_busy))begin TfVMD2<=1'd1;agVMD2<=1'd1;end else if(
+EeVMD2)EeVMD2<=1'd0;else if(bgVMD2>0)begin EeVMD2<=1'd1;SfVMD2<={1'd0,JeVMD2[29
+:24]};JeVMD2[29:6]<=JeVMD2[23:0];bgVMD2<=bgVMD2-3'd1;TfVMD2<=1'd1;agVMD2<=1'd1
+;end else if(~SfVMD2[6])begin EeVMD2<=1'd1;SfVMD2<=7'd64;TfVMD2<=1'd1;agVMD2<=
+1'd1;end else begin agVMD2<=1'd0;TfVMD2<=(agVMD2);end endmodule module DfVMD2(
+i_clk,CeVMD2,ffVMD2,cgVMD2,dgVMD2,hfVMD2,EeVMD2,egVMD2,TfVMD2,i_tx_busy);input
+i_clk;input CeVMD2;input[35:0]ffVMD2;input cgVMD2,dgVMD2,hfVMD2;output reg
+EeVMD2;output reg[35:0]egVMD2;output reg TfVMD2;input i_tx_busy;reg fgVMD2,
+ggVMD2;initial fgVMD2=1'd0;always@(posedge i_clk)if((EeVMD2)&&(~i_tx_busy)&&(
+egVMD2[35:30]==6'd4))fgVMD2<=hfVMD2;else fgVMD2<=(fgVMD2)||(hfVMD2);wire hgVMD2
+;reg igVMD2;reg[35:0]jgVMD2;initial jgVMD2=36'd0;always@(posedge i_clk)if((
+CeVMD2)||(EeVMD2))jgVMD2<=36'd0;else if(~jgVMD2[35])jgVMD2<=jgVMD2+36'd43;
+initial igVMD2=1'd0;always@(posedge i_clk)if((EeVMD2)&&(~i_tx_busy)&&(egVMD2[35
+:31]==5'd0))igVMD2<=1'd1;else if(~jgVMD2[35])igVMD2<=1'd0;assign hgVMD2=(~
+igVMD2)&&(jgVMD2[35]);initial EeVMD2=1'd0;initial TfVMD2=1'd0;always@(posedge
+i_clk)if((EeVMD2)&&(i_tx_busy))begin TfVMD2<=1'd1;end else if(EeVMD2)begin
+EeVMD2<=1'd0;TfVMD2<=1'd1;end else if(TfVMD2)TfVMD2<=1'd0;else if(CeVMD2)begin
+egVMD2<=ffVMD2;EeVMD2<=1'd1;TfVMD2<=1'd1;end else if((fgVMD2)&&(~ggVMD2))begin
+EeVMD2<=1'd1;egVMD2<={6'd4,30'd0};TfVMD2<=1'd1;end else if(hgVMD2)begin EeVMD2
+<=1'd1;TfVMD2<=1'd1;if(cgVMD2)egVMD2<={6'd1,30'd0};else egVMD2<={6'd0,30'd0};
+end initial ggVMD2=1'd0;always@(posedge i_clk)if((fgVMD2)&&((~EeVMD2)&&(~TfVMD2
+)&&(~CeVMD2)))ggVMD2<=1'd1;else if(~hfVMD2)ggVMD2<=1'd0;endmodule module kgVMD2
+(i_clk,CeVMD2,lgVMD2,mgVMD2,EeVMD2,egVMD2);input i_clk,CeVMD2,lgVMD2;input[5:0
+]mgVMD2;output reg EeVMD2;output reg[35:0]egVMD2;reg[2:0]bgVMD2,ngVMD2;reg[1:0
+]ogVMD2;wire pgVMD2;assign pgVMD2=((bgVMD2==ngVMD2)&&(ngVMD2!=0))||((CeVMD2)&&
+(~lgVMD2)&&(ogVMD2==2'd1));initial bgVMD2=3'd0;always@(posedge i_clk)if((CeVMD2
+)&&(~lgVMD2))bgVMD2<=0;else if(pgVMD2)bgVMD2<=(CeVMD2)?3'd1:3'd0;else if(CeVMD2
+)bgVMD2<=bgVMD2+3'd1;reg[35:0]qgVMD2;always@(posedge i_clk)if(pgVMD2)qgVMD2[35
+:30]<=mgVMD2;else if(CeVMD2)case(bgVMD2)3'd0:qgVMD2[35:30]<=mgVMD2;3'd1:qgVMD2
+[29:24]<=mgVMD2;3'd2:qgVMD2[23:18]<=mgVMD2;3'd3:qgVMD2[17:12]<=mgVMD2;3'd4:
+qgVMD2[11:6]<=mgVMD2;3'd5:qgVMD2[5:0]<=mgVMD2;default:begin end endcase always
+@(posedge i_clk)if(EeVMD2)ogVMD2<=egVMD2[35:34];always@(posedge i_clk)if((
+CeVMD2)&&(~lgVMD2)&&(ogVMD2==2'd1))egVMD2[35:30]<=6'd46;else egVMD2<=qgVMD2;
+initial ngVMD2=3'd0;always@(posedge i_clk)if((CeVMD2)&&(~lgVMD2))ngVMD2<=0;else
+if((CeVMD2)&&((ngVMD2==0)||(pgVMD2)))begin if(mgVMD2[5:4]==2'd3)ngVMD2<=3'd2;
+else if(mgVMD2[5:4]==2'd2)ngVMD2<=3'd1;else if(mgVMD2[5:3]==3'd2)ngVMD2<=3'd2;
+else if(mgVMD2[5:3]==3'd1)ngVMD2<=3'd2+{1'd0,mgVMD2[2:1]};else ngVMD2<=3'd6;end
+else if(pgVMD2)ngVMD2<=0;always@(posedge i_clk)EeVMD2<=pgVMD2;endmodule module
+FfVMD2(i_clk,CeVMD2,ffVMD2,EeVMD2,rgVMD2,dgVMD2);parameter DW=32,CW=36,TBITS=10
+;input i_clk,CeVMD2;input[(CW-1):0]ffVMD2;output wire EeVMD2;output wire[(CW-1
+):0]rgVMD2;input dgVMD2;reg sgVMD2;reg[35:0]tgVMD2;wire[31:0]MeVMD2;assign
+MeVMD2=ffVMD2[31:0];always@(posedge i_clk)if((CeVMD2)&&(~sgVMD2))begin if(
+ffVMD2[35:32]!=4'd2)begin tgVMD2<=ffVMD2;end else if(MeVMD2[31:6]==26'd0)tgVMD2
+<={6'd12,MeVMD2[5:0],24'd0};else if(MeVMD2[31:12]==20'd0)tgVMD2<={6'd13,MeVMD2
+[11:0],18'd0};else if(MeVMD2[31:18]==14'd0)tgVMD2<={6'd14,MeVMD2[17:0],12'd0};
+else if(MeVMD2[31:24]==8'd0)tgVMD2<={6'd15,MeVMD2[23:0],6'd0};else begin tgVMD2
+<=ffVMD2;end end initial sgVMD2=1'd0;always@(posedge i_clk)if((CeVMD2)&&(~
+sgVMD2))sgVMD2<=CeVMD2;else if(~dgVMD2)sgVMD2<=1'd0;wire ugVMD2;assign ugVMD2=
+(sgVMD2)&&(~dgVMD2);reg PeVMD2;always@(posedge i_clk)PeVMD2<=sgVMD2;wire[35:0]
+JeVMD2;assign JeVMD2=tgVMD2;reg[(TBITS-1):0]vgVMD2;reg wgVMD2;always@(posedge
+i_clk)if(ugVMD2)begin if(rgVMD2[35:33]==3'd1)vgVMD2<=0;else if(rgVMD2[35:33]==
+3'd7)vgVMD2<=vgVMD2+{{(TBITS-1){1'd0}},1'd1};end always@(posedge i_clk)if((
+ugVMD2)&&(rgVMD2[35:33]==3'd1))wgVMD2<=1'd0;else if(vgVMD2==10'd1023)wgVMD2<=
+1'd1;reg[31:0]IeVMD2[0:((1<<TBITS)-1)];always@(posedge i_clk)IeVMD2[vgVMD2]<={
+JeVMD2[32:31],JeVMD2[29:0]};reg xgVMD2,ygVMD2;reg[(TBITS-1):0]zgVMD2;reg[(TBITS
+-1):0]AgVMD2;initial zgVMD2=0;initial xgVMD2=0;always@(posedge i_clk)begin
+ygVMD2<=((AgVMD2-vgVMD2)=={{(TBITS-1){1'd0}},1'd1});if((ugVMD2)||(~sgVMD2))
+begin zgVMD2<=vgVMD2+{(TBITS){1'd1}};AgVMD2=vgVMD2+{{(TBITS-1){1'd1}},1'd0};
+xgVMD2<=1'd0;end else if((~xgVMD2)&&(~BgVMD2)&&((~AgVMD2[TBITS-1])||(wgVMD2)))
+begin zgVMD2<=AgVMD2;AgVMD2=AgVMD2-{{(TBITS-1){1'd0}},1'd1};xgVMD2<=ygVMD2;end
+end reg[1:0]CgVMD2;reg DgVMD2,EgVMD2;reg[(DW-1):0]OeVMD2;reg[(TBITS-1):0]FgVMD2
+,GgVMD2,HgVMD2;always@(posedge i_clk)begin OeVMD2<=IeVMD2[zgVMD2];FgVMD2<=
+zgVMD2;DgVMD2<=(OeVMD2=={JeVMD2[32:31],JeVMD2[29:0]});GgVMD2<=FgVMD2;HgVMD2<=
+vgVMD2-FgVMD2;EgVMD2<=({1'd0,FgVMD2}<{wgVMD2,vgVMD2})&&(FgVMD2!=vgVMD2);end
+always@(posedge i_clk)if((ugVMD2)||(~sgVMD2))CgVMD2<=0;else CgVMD2<={CgVMD2[0]
+,1'd1};reg BgVMD2;reg[(TBITS-1):0]IgVMD2;always@(posedge i_clk)if((ugVMD2)||(~
+sgVMD2)||(~PeVMD2))BgVMD2<=1'd0;else if(~BgVMD2)begin BgVMD2<=(EgVMD2)&&(DgVMD2
+)&&(JeVMD2[35:33]==3'd7)&&(CgVMD2==2'd3);end reg JgVMD2,KgVMD2,LgVMD2;always@(
+posedge i_clk)if(~BgVMD2)begin IgVMD2<=HgVMD2;LgVMD2<=(HgVMD2<10'd1313);JgVMD2
+<=(HgVMD2==10'd1);KgVMD2<=(HgVMD2<10'd10);end wire[(TBITS-1):0]MgVMD2;wire[9:0
+]NgVMD2;wire[2:0]OgVMD2;assign MgVMD2=IgVMD2;assign OgVMD2=IgVMD2[2:0]-3'd2;
+assign NgVMD2=IgVMD2-10'd10;reg[(CW-1):0]PgVMD2;always@(posedge i_clk)begin if
+((~sgVMD2)||(~PeVMD2)||(ugVMD2))begin PgVMD2<=JeVMD2;end else if((BgVMD2)&&(
+LgVMD2))begin PgVMD2<=JeVMD2;if(JgVMD2)PgVMD2[35:30]<={5'd3,JeVMD2[30]};else if
+(KgVMD2)PgVMD2[35:30]<={2'd2,OgVMD2,JeVMD2[30]};else PgVMD2[35:24]<={2'd1,
+NgVMD2[8:6],JeVMD2[30],NgVMD2[5:0]};end else PgVMD2<=JeVMD2;end assign EeVMD2=
+sgVMD2;assign rgVMD2=(PeVMD2)?(PgVMD2):(tgVMD2);endmodule module veVMD2(i_clk,
+QeVMD2,CeVMD2,ffVMD2,TfVMD2,o_wb_cyc,o_wb_stb,o_wb_we,o_wb_addr,o_wb_data,
+i_wb_ack,i_wb_stall,i_wb_err,i_wb_data,EeVMD2,egVMD2);input i_clk,QeVMD2;input
+CeVMD2;input[35:0]ffVMD2;output wire TfVMD2;output reg o_wb_cyc;output reg
+o_wb_stb;output reg o_wb_we;output reg[31:0]o_wb_addr,o_wb_data;input i_wb_ack
+,i_wb_stall,i_wb_err;input[31:0]i_wb_data;output reg EeVMD2;output reg[35:0]
+egVMD2;wire QgVMD2,RgVMD2,SgVMD2,TgVMD2;assign QgVMD2=(CeVMD2)&&(~TfVMD2);
+assign SgVMD2=(QgVMD2)&&(ffVMD2[35:34]==2'd1);assign RgVMD2=(QgVMD2)&&(ffVMD2[
+35:30]==6'd46);wire[31:0]UgVMD2;assign UgVMD2={ffVMD2[32:31],ffVMD2[29:0]};
+assign TgVMD2=((QgVMD2)&&(ffVMD2[35:33]!=3'd3)&&(ffVMD2[35:30]!=6'd46));reg[2:0
+]VgVMD2;reg[9:0]WgVMD2,bgVMD2;reg XgVMD2,YgVMD2,ZgVMD2,ahVMD2,bhVMD2;reg chVMD2
+;initial YgVMD2=1'd1;initial VgVMD2=3'd0;initial EeVMD2=1'd0;always@(posedge
+i_clk)if(QeVMD2)begin VgVMD2<=3'd0;EeVMD2<=1'd1;egVMD2<={6'd3,i_wb_data[29:0]}
+;o_wb_cyc<=1'd0;o_wb_stb<=1'd0;end else case(VgVMD2)3'd0:begin o_wb_cyc<=1'd0;
+o_wb_stb<=1'd0;EeVMD2<=1'd0;XgVMD2<=ffVMD2[30];o_wb_we<=(~ffVMD2[35]);egVMD2<=
+{4'd2,o_wb_addr};o_wb_we<=(ffVMD2[35:34]!=2'd3);o_wb_data<=UgVMD2;if(CeVMD2)
+begin casez(ffVMD2[35:32])4'd0:begin o_wb_addr<=ffVMD2[31:0];end 4'b001?:begin
+o_wb_addr<=o_wb_addr+{ffVMD2[32:31],ffVMD2[29:0]};end 4'b01??:begin VgVMD2<=
+3'd2;o_wb_cyc<=1'd1;o_wb_stb<=1'd1;end 4'b11??:begin if(YgVMD2)EeVMD2<=1'd1;
+VgVMD2<=3'd1;o_wb_cyc<=1'd1;o_wb_stb<=1'd1;end default:;endcase end end 3'd1:
+begin o_wb_cyc<=1'd1;o_wb_stb<=1'd1;if(i_wb_err)VgVMD2<=3'd0;EeVMD2<=(i_wb_err
+)||(i_wb_ack);if(i_wb_err)egVMD2<={6'd5,i_wb_data[29:0]};else egVMD2<={3'd7,
+i_wb_data[31:30],XgVMD2,i_wb_data[29:0]};if((XgVMD2)&&(~i_wb_stall))o_wb_addr
+<=o_wb_addr+32'd1;if(~i_wb_stall)begin if((chVMD2)||(ZgVMD2))begin VgVMD2<=3'd3
+;o_wb_stb<=1'd0;end end end 3'd2:begin o_wb_cyc<=1'd1;o_wb_stb<=1'd1;if(
+i_wb_err)egVMD2<={6'd5,i_wb_data[29:0]};else egVMD2<={6'd2,i_wb_data[29:0]};if
+((XgVMD2)&&(~i_wb_stall))o_wb_addr<=o_wb_addr+32'd1;EeVMD2<=(i_wb_err)||(~
+i_wb_stall);if(i_wb_err)begin VgVMD2<=3'd5;o_wb_cyc<=1'd0;o_wb_stb<=1'd0;end
+else if(~i_wb_stall)begin VgVMD2<=3'd4;o_wb_stb<=1'd0;end end 3'd3:begin
+o_wb_cyc<=1'd1;o_wb_stb<=1'd0;if(i_wb_err)egVMD2<={6'd5,i_wb_data[29:0]};else
+egVMD2<={3'd7,i_wb_data[31:30],XgVMD2,i_wb_data[29:0]};EeVMD2<=(((i_wb_ack)&&(
+~o_wb_we))||(i_wb_err));if(((ahVMD2)&&(i_wb_ack))||(bhVMD2)||(i_wb_err))begin
+o_wb_cyc<=1'd0;VgVMD2<=3'd0;end end 3'd4:begin egVMD2<={6'd5,i_wb_data[29:0]};
+EeVMD2<=(i_wb_err)||(TgVMD2);o_wb_data<=UgVMD2;o_wb_cyc<=1'd1;o_wb_stb<=1'd0;if
+(TgVMD2)begin o_wb_cyc<=1'd0;VgVMD2<=3'd0;end else if(i_wb_err)begin o_wb_cyc
+<=1'd0;VgVMD2<=3'd5;end else if(SgVMD2)begin VgVMD2<=3'd2;o_wb_stb<=1'd1;end
+else if(RgVMD2)VgVMD2<=3'd3;end 3'd5:begin o_wb_cyc<=1'd0;o_wb_stb<=1'd0;egVMD2
+<={6'd5,i_wb_data[29:0]};EeVMD2<=(TgVMD2);if((RgVMD2)||(TgVMD2))VgVMD2<=3'd0;
+end default:begin EeVMD2<=1'd1;egVMD2<={6'd3,i_wb_data[29:0]};VgVMD2<=3'd0;
+o_wb_cyc<=1'd0;o_wb_stb<=1'd0;end endcase assign TfVMD2=(VgVMD2!=3'd0)&&(VgVMD2
+!=3'd4)&&(VgVMD2!=3'd5);always@(posedge i_clk)if(QeVMD2)YgVMD2<=1'd1;else if((
+~o_wb_cyc)&&(CeVMD2)&&(~ffVMD2[35]))YgVMD2<=1'd1;else if(o_wb_cyc)YgVMD2<=1'd0
+;always@(posedge i_clk)if(~o_wb_cyc)WgVMD2<=10'd0;else if((o_wb_stb)&&(~
+i_wb_stall)&&(~i_wb_ack))WgVMD2<=WgVMD2+10'd1;else if(((~o_wb_stb)||(i_wb_stall
+))&&(i_wb_ack))WgVMD2<=WgVMD2-10'd1;always@(posedge i_clk)ahVMD2<=(~o_wb_stb)
+&&(WgVMD2==10'd1)||(o_wb_stb)&&(WgVMD2==10'd0);always@(posedge i_clk)bhVMD2<=(
+~o_wb_stb)&&(WgVMD2==10'd0);always@(posedge i_clk)if(~o_wb_stb)bgVMD2<=ffVMD2[9
+:0];else if((o_wb_stb)&&(~i_wb_stall)&&(|bgVMD2))bgVMD2<=bgVMD2-10'd1;always@(
+posedge i_clk)begin chVMD2<=(~o_wb_cyc)&&(ffVMD2[9:0]==10'd1);ZgVMD2<=(o_wb_stb
+)&&(bgVMD2[9:2]==8'd0)&&((~bgVMD2[1])||((~bgVMD2[0])&&(~i_wb_stall)));end
+endmodule module jeVMD2(i_clk,CeVMD2,OfVMD2,EeVMD2,egVMD2);input i_clk,CeVMD2;
+input[7:0]OfVMD2;output wire EeVMD2;output wire[35:0]egVMD2;wire dhVMD2,ehVMD2
+;wire[5:0]fhVMD2;NfVMD2 ghVMD2(i_clk,CeVMD2,OfVMD2,dhVMD2,ehVMD2,fhVMD2);wire
+qfVMD2;wire[35:0]hhVMD2;kgVMD2 ihVMD2(i_clk,dhVMD2,ehVMD2,fhVMD2,qfVMD2,hhVMD2
+);BeVMD2 jhVMD2(i_clk,qfVMD2,hhVMD2,EeVMD2,egVMD2);endmodule module LfVMD2(
+i_clk,CeVMD2,khVMD2,EeVMD2,jfVMD2,TfVMD2,dgVMD2);input i_clk;input CeVMD2;input
+[6:0]khVMD2;output reg EeVMD2;output reg[7:0]jfVMD2;output wire TfVMD2;input
+dgVMD2;initial jfVMD2=8'd0;always@(posedge i_clk)if((CeVMD2)&&(~TfVMD2))begin
+if(khVMD2[6])jfVMD2<=8'd10;else if(khVMD2[5:0]<=6'd9)jfVMD2<=8'd48+{4'd0,khVMD2
+[3:0]};else if(khVMD2[5:0]<=6'd35)jfVMD2<=8'd65+{2'd0,khVMD2[5:0]}-8'd10;else
+if(khVMD2[5:0]<=6'd61)jfVMD2<=8'd97+{2'd0,khVMD2[5:0]}-8'd36;else if(khVMD2[5:0
+]==6'd62)jfVMD2<=8'd64;else jfVMD2<=8'd37;end always@(posedge i_clk)if((EeVMD2
+)&&(~dgVMD2))EeVMD2<=1'd0;else if((CeVMD2)&&(~EeVMD2))EeVMD2<=1'd1;assign
+TfVMD2=EeVMD2;endmodule
