@@ -18,7 +18,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -30,12 +30,16 @@
 // FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 // for more details.
 //
+// You should have received a copy of the GNU General Public License along
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
+// target there if the PDF file isn't present.)  If not, see
+// <http://www.gnu.org/licenses/> for a copy.
+//
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
 //
 //
 #include <stdio.h>
@@ -55,304 +59,56 @@
 #include "deppi.h"
 #include "regdefs.h"
 #include "flashdrvr.h"
-
-bool	iself(const char *fname) {
-	FILE	*fp;
-	bool	ret = true;
-
-	if ((!fname)||(!fname[0]))
-		return false;
-
-	fp = fopen(fname, "rb");
-
-	if (!fp)	return false;
-	if (0x7f != fgetc(fp))	ret = false;
-	if ('E'  != fgetc(fp))	ret = false;
-	if ('L'  != fgetc(fp))	ret = false;
-	if ('F'  != fgetc(fp))	ret = false;
-	fclose(fp);
-	return 	ret;
-}
-
-long	fgetwords(FILE *fp) {
-	// Return the number of words in the current file, and return the 
-	// file as though it had never been adjusted
-	long	fpos, flen;
-	fpos = ftell(fp);
-	if (0 != fseek(fp, 0l, SEEK_END)) {
-		fprintf(stderr, "ERR: Could not determine file size\n");
-		perror("O/S Err:");
-		exit(-2);
-	} flen = ftell(fp);
-	if (0 != fseek(fp, fpos, SEEK_SET)) {
-		fprintf(stderr, "ERR: Could not seek on file\n");
-		perror("O/S Err:");
-		exit(-2);
-	} flen /= sizeof(FPGA::BUSW);
-	return flen;
-}
+#include "zipelf.h"
 
 FPGA	*m_fpga;
-class	SECTION {
-public:
-	unsigned	m_start, m_len;
-	FPGA::BUSW	m_data[1];
-};
-
-SECTION	**singlesection(int nwords) {
-	fprintf(stderr, "NWORDS = %d\n", nwords);
-	size_t	sz = (2*(sizeof(SECTION)+sizeof(SECTION *))
-		+(nwords-1)*(sizeof(FPGA::BUSW)));
-	char	*d = (char *)malloc(sz);
-	SECTION **r = (SECTION **)d;
-	memset(r, 0, sz);
-	r[0] = (SECTION *)(&d[2*sizeof(SECTION *)]);
-	r[0]->m_len   = nwords;
-	r[1] = (SECTION *)(&r[0]->m_data[r[0]->m_len]);
-	r[0]->m_start = 0;
-	r[1]->m_start = 0;
-	r[1]->m_len   = 0;
-
-	return r;
-}
-
-SECTION **rawsection(const char *fname) {
-	SECTION		**secpp, *secp;
-	unsigned	num_words;
-	FILE		*fp;
-	int		nr;
-
-	fp = fopen(fname, "r");
-	if (fp == NULL) {
-		fprintf(stderr, "Could not open: %s\n", fname);
-		exit(-1);
-	}
-
-	if ((num_words=fgetwords(fp)) > FLASHWORDS-(RESET_ADDRESS-SPIFLASH)) {
-		fprintf(stderr, "File overruns flash memory\n");
-		exit(-1);
-	}
-	secpp = singlesection(num_words);
-	secp = secpp[0];
-	secp->m_start = RAMBASE;
-	secp->m_len = num_words;
-	nr= fread(secp->m_data, sizeof(FPGA::BUSW), num_words, fp);
-	if (nr != (int)num_words) {
-		fprintf(stderr, "Could not read entire file\n");
-		perror("O/S Err:");
-		exit(-2);
-	} assert(secpp[1]->m_len == 0);
-
-	return secpp;
-}
-
-unsigned	byteswap(unsigned n) {
-	unsigned	r;
-
-	r = (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-
-	return r;
-}
-
-// #define	CHEAP_AND_EASY
-#ifdef	CHEAP_AND_EASY
-#else
-#include <libelf.h>
-#include <gelf.h>
-
-void	elfread(const char *fname, unsigned &entry, SECTION **&sections) {
-	Elf	*e;
-	int	fd, i;
-	size_t	n;
-	char	*id;
-	Elf_Kind	ek;
-	GElf_Ehdr	ehdr;
-	GElf_Phdr	phdr;
-	const	bool	dbg = false;
-
-	if (elf_version(EV_CURRENT) == EV_NONE) {
-		fprintf(stderr, "ELF library initialization err, %s\n", elf_errmsg(-1));
-		perror("O/S Err:");
-		exit(EXIT_FAILURE);
-	} if ((fd = open(fname, O_RDONLY, 0)) < 0) {
-		fprintf(stderr, "Could not open %s\n", fname);
-		perror("O/S Err:");
-		exit(EXIT_FAILURE);
-	} if ((e = elf_begin(fd, ELF_C_READ, NULL))==NULL) {
-		fprintf(stderr, "Could not run elf_begin, %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	}
-
-	ek = elf_kind(e);
-	if (ek == ELF_K_ELF) {
-		; // This is the kind of file we should expect
-	} else if (ek == ELF_K_AR) {
-		fprintf(stderr, "Cannot run an archive!\n");
-		exit(EXIT_FAILURE);
-	} else if (ek == ELF_K_NONE) {
-		;
-	} else {
-		fprintf(stderr, "Unexpected ELF file kind!\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (gelf_getehdr(e, &ehdr) == NULL) {
-		fprintf(stderr, "getehdr() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if ((i=gelf_getclass(e)) == ELFCLASSNONE) {
-		fprintf(stderr, "getclass() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if ((id = elf_getident(e, NULL)) == NULL) {
-		fprintf(stderr, "getident() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if (i != ELFCLASS32) {
-		fprintf(stderr, "This is a 64-bit ELF file, ZipCPU ELF files are all 32-bit\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (dbg) {
-	printf("    %-20s 0x%jx\n", "e_type", (uintmax_t)ehdr.e_type);
-	printf("    %-20s 0x%jx\n", "e_machine", (uintmax_t)ehdr.e_machine);
-	printf("    %-20s 0x%jx\n", "e_version", (uintmax_t)ehdr.e_version);
-	printf("    %-20s 0x%jx\n", "e_entry", (uintmax_t)ehdr.e_entry);
-	printf("    %-20s 0x%jx\n", "e_phoff", (uintmax_t)ehdr.e_phoff);
-	printf("    %-20s 0x%jx\n", "e_shoff", (uintmax_t)ehdr.e_shoff);
-	printf("    %-20s 0x%jx\n", "e_flags", (uintmax_t)ehdr.e_flags);
-	printf("    %-20s 0x%jx\n", "e_ehsize", (uintmax_t)ehdr.e_ehsize);
-	printf("    %-20s 0x%jx\n", "e_phentsize", (uintmax_t)ehdr.e_phentsize);
-	printf("    %-20s 0x%jx\n", "e_shentsize", (uintmax_t)ehdr.e_shentsize);
-	printf("\n");
-	}
-
-
-	// Check whether or not this is an ELF file for the ZipCPU ...
-	if (ehdr.e_machine != 0x0dadd) {
-		fprintf(stderr, "This is not a ZipCPU ELF file\n");
-		exit(EXIT_FAILURE);
-	}
-
-	// Get our entry address
-	entry = ehdr.e_entry;
-
-
-	// Now, let's go look at the program header
-	if (elf_getphdrnum(e, &n) != 0) {
-		fprintf(stderr, "elf_getphdrnum() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	}
-
-	unsigned total_octets = 0, current_offset=0, current_section=0;
-	for(i=0; i<(int)n; i++) {
-		total_octets += sizeof(SECTION *)+sizeof(SECTION);
-
-		if (gelf_getphdr(e, i, &phdr) != &phdr) {
-			fprintf(stderr, "getphdr() failed: %s\n", elf_errmsg(-1));
-			exit(EXIT_FAILURE);
-		}
-
-		if (dbg) {
-		printf("    %-20s 0x%x\n", "p_type",   phdr.p_type);
-		printf("    %-20s 0x%jx\n", "p_offset", phdr.p_offset);
-		printf("    %-20s 0x%jx\n", "p_vaddr",  phdr.p_vaddr);
-		printf("    %-20s 0x%jx\n", "p_paddr",  phdr.p_paddr);
-		printf("    %-20s 0x%jx\n", "p_filesz", phdr.p_filesz);
-		printf("    %-20s 0x%jx\n", "p_memsz",  phdr.p_memsz);
-		printf("    %-20s 0x%x [", "p_flags",  phdr.p_flags);
-
-		if (phdr.p_flags & PF_X)	printf(" Execute");
-		if (phdr.p_flags & PF_R)	printf(" Read");
-		if (phdr.p_flags & PF_W)	printf(" Write");
-		printf("]\n");
-		printf("    %-20s 0x%jx\n", "p_align", phdr.p_align);
-		}
-
-		total_octets += phdr.p_memsz;
-	}
-
-	char	*d = (char *)malloc(total_octets + sizeof(SECTION)+sizeof(SECTION *));
-	memset(d, 0, total_octets);
-
-	SECTION **r = sections = (SECTION **)d;
-	current_offset = (n+1)*sizeof(SECTION *);
-	current_section = 0;
-
-	for(i=0; i<(int)n; i++) {
-		r[i] = (SECTION *)(&d[current_offset]);
-
-		if (gelf_getphdr(e, i, &phdr) != &phdr) {
-			fprintf(stderr, "getphdr() failed: %s\n", elf_errmsg(-1));
-			exit(EXIT_FAILURE);
-		}
-
-		if (dbg) {
-		printf("    %-20s 0x%jx\n", "p_offset", phdr.p_offset);
-		printf("    %-20s 0x%jx\n", "p_vaddr",  phdr.p_vaddr);
-		printf("    %-20s 0x%jx\n", "p_paddr",  phdr.p_paddr);
-		printf("    %-20s 0x%jx\n", "p_filesz", phdr.p_filesz);
-		printf("    %-20s 0x%jx\n", "p_memsz",  phdr.p_memsz);
-		printf("    %-20s 0x%x [", "p_flags",  phdr.p_flags);
-
-		if (phdr.p_flags & PF_X)	printf(" Execute");
-		if (phdr.p_flags & PF_R)	printf(" Read");
-		if (phdr.p_flags & PF_W)	printf(" Write");
-		printf("]\n");
-
-		printf("    %-20s 0x%jx\n", "p_align", phdr.p_align);
-		}
-
-		current_section++;
-
-		r[i]->m_start = phdr.p_paddr;
-		r[i]->m_len   = phdr.p_filesz/ sizeof(FPGA::BUSW);
-
-		current_offset += phdr.p_memsz + sizeof(SECTION);
-
-		// Now, let's read in our section ...
-		if (lseek(fd, phdr.p_offset, SEEK_SET) < 0) {
-			fprintf(stderr, "Could not seek to file position %08lx\n", phdr.p_offset);
-			perror("O/S Err:");
-			exit(EXIT_FAILURE);
-		} if (phdr.p_filesz > phdr.p_memsz)
-			phdr.p_filesz = 0;
-		if (read(fd, r[i]->m_data, phdr.p_filesz) != (int)phdr.p_filesz) {
-			fprintf(stderr, "Didnt read entire section\n");
-			perror("O/S Err:");
-			exit(EXIT_FAILURE);
-		}
-
-		// Next, we need to byte swap it from big to little endian
-		for(unsigned j=0; j<r[i]->m_len; j++)
-			r[i]->m_data[j] = byteswap(r[i]->m_data[j]);
-
-		if (dbg) for(unsigned j=0; j<r[i]->m_len; j++)
-			fprintf(stderr, "ADR[%04x] = %08x\n", r[i]->m_start+j,
-			r[i]->m_data[j]);
-	}
-
-	r[i] = (SECTION *)(&d[current_offset]);
-	r[current_section]->m_start = 0;
-	r[current_section]->m_len   = 0;
-
-	elf_end(e);
-	close(fd);
-}
-#endif
 
 void	usage(void) {
 	printf("USAGE: zipload [-h] [<bit-file> [<alt-bit-file>]] <zip-program-file>\n");
 	printf("\n"
-"\t-h\tDisplay this usage statement\n");
+"\t-h\tDisplay this usage statement\n"
+);
+}
+
+void	skip_bitfile_header(FILE *fp) {
+	const unsigned	SEARCHLN = 204, MATCHLN = 16;
+	const unsigned char matchstr[MATCHLN] = {
+		0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff,
+		//
+		0xaa, 0x99, 0x55, 0x66 };
+	unsigned char	buf[SEARCHLN];
+
+	rewind(fp);
+	fread(buf, sizeof(char), SEARCHLN, fp);
+	for(int start=0; start+MATCHLN<SEARCHLN; start++) {
+		int	mloc;
+
+		// Search backwards, since the starting bytes just aren't that
+		// interesting.
+		for(mloc = MATCHLN-1; mloc >= 0; mloc--)
+			if (buf[start+mloc] != matchstr[mloc])
+				break;
+		if (mloc < 0) {
+			fseek(fp, start, SEEK_SET);
+			return;
+		}
+	}
+
+	fprintf(stderr, "Could not find bin-file header within bit file\n");
+	fclose(fp);
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv) {
-	int		skp=0;
-	bool		permit_raw_files = false, debug_only = false;
-	unsigned	entry = RAMBASE;
+	int		skp=0, argn;
+	bool		debug_only = false, verbose = false;
+	unsigned	entry = 0;
 	FLASHDRVR	*flash = NULL;
-	const char	*bitfile = NULL, *altbitfile = NULL;
+	const char	*bitfile = NULL, *altbitfile = NULL, *execfile = NULL;
+	size_t		bitsz;
+	FILE		*fp;
 
 	if (argc < 2) {
 		usage();
@@ -360,7 +116,7 @@ int main(int argc, char **argv) {
 	}
 
 	skp=1;
-	for(int argn=0; argn<argc-skp; argn++) {
+	for(argn=0; argn<argc-skp; argn++) {
 		if (argv[argn+skp][0] == '-') {
 			switch(argv[argn+skp][1]) {
 			case 'd':
@@ -370,8 +126,8 @@ int main(int argc, char **argv) {
 				usage();
 				exit(EXIT_SUCCESS);
 				break;
-			case 'r':
-				permit_raw_files = true;
+			case 'v':
+				verbose = true;
 				break;
 			default:
 				fprintf(stderr, "Unknown option, -%c\n\n",
@@ -380,56 +136,90 @@ int main(int argc, char **argv) {
 				exit(EXIT_FAILURE);
 				break;
 			} skp++; argn--;
-		} else { // Check for bit files
-			int sl = strlen(argv[argn+skp]);
-			if ((sl>4)&&(strcmp(&argv[argn+skp][sl-4],".bit")==0)) {
-				if (bitfile == NULL)
-					bitfile = argv[argn+skp];
-				else if (altbitfile == NULL)
-					altbitfile = argv[argn+skp];
-				else {
-					fprintf(stderr, "Err: Too many bit files listed\n");
-					exit(EXIT_FAILURE);
-				} skp++; argn--;
-			} else
-				argv[argn] = argv[argn+skp];
+		} else {
+			// Anything here must be either the program to load,
+			// or a bit file to load
+			argv[argn] = argv[argn+skp];
 		}
 	} argc -= skp;
 
 
-	if ((bitfile)&&(access(bitfile,R_OK)!=0)) {
-		fprintf(stderr, "Cannot open bitfile, %s\n", bitfile);
-		exit(EXIT_FAILURE);
-	} if ((altbitfile)&&(access(altbitfile,R_OK)!=0)) {
-		fprintf(stderr, "Cannot open alternate bitfile, %s\n",
-			altbitfile);
-		exit(EXIT_FAILURE);
-	} if(((!bitfile)&&(argc<=0)) || ((argc>0)&&(access(argv[0],R_OK)!=0))) {
-		// If there's no code file, or the code file cannot be opened
-		if (argc>0)
-			fprintf(stderr, "Cannot open executable, %s\n", argv[0]);
-		else
-			usage();
+	for(argn=0; argn<argc; argn++) {
+		if (iself(argv[argn])) {
+			if (execfile) {
+				printf("Too many executable files given, %s and %s\n", execfile, argv[argn]);
+				usage();
+				exit(EXIT_FAILURE);
+			} execfile = argv[argn];
+		} else { // if (isbitfile(argv[argn]))
+			if (!bitfile)
+				bitfile = argv[argn];
+			else if (!altbitfile)
+				altbitfile = argv[argn];
+			else {
+				printf("Unknown file name or too many files, %s\n", argv[argn]);
+				usage();
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
+
+if (verbose) {
+if (bitfile)	printf(" BITFILE: %s\n", bitfile);
+if (altbitfile)	printf("ABITFILE: %s\n", altbitfile);
+if (execfile)	printf("EXECTFILE: %s\n", execfile);
+}
+
+	if ((execfile == NULL)&&(bitfile == NULL)) {
+		printf("No executable or bit file(s) given!\n\n");
+		usage();
 		exit(EXIT_FAILURE);
 	}
 
-	const char *codef = (argc>0)?argv[0]:NULL;
-	DEVBUS::BUSW	*fbuf = new DEVBUS::BUSW[FLASHWORDS];
+	if ((bitfile == NULL)&&(altbitfile != NULL)) {
+		printf("Cannot program an alternate bitfile without a main bitfile\n\n");
+		usage();
+		exit(EXIT_FAILURE);
+	}
+
+	if ((bitfile)&&(access(bitfile,R_OK)!=0)) {
+		// If there's no code file, or the code file cannot be opened
+		fprintf(stderr, "Cannot open bitfile, %s\n", bitfile);
+		exit(EXIT_FAILURE);
+	}
+
+	if ((altbitfile)&&(access(altbitfile,R_OK)!=0)) {
+		// If there's no code file, or the code file cannot be opened
+		fprintf(stderr, "Cannot open alternate bitfile, %s\n", altbitfile);
+		exit(EXIT_FAILURE);
+	} if ((execfile)&&(access(execfile,R_OK)!=0)) {
+		// If there's no code file, or the code file cannot be opened
+		fprintf(stderr, "Cannot open executable, %s\n\n", execfile);
+		usage();
+		exit(EXIT_FAILURE);
+	} else if (!iself(execfile)) {
+		printf("%s is not an executable file\n\n", execfile);
+		usage();
+		exit(EXIT_FAILURE);
+	}
+
+	char	*fbuf = new char[FLASHLEN];
 
 	// Set the flash buffer to all ones
-	memset(fbuf, -1, FLASHWORDS*sizeof(fbuf[0]));
+	memset(fbuf, -1, FLASHLEN);
 
 	if (debug_only) {
 		m_fpga = NULL;
 	} else {
         	char    szSel[64];
-        	strcpy(szSel, "SN:210282768825");
+        	strcpy(szSel, S6SN);
 		m_fpga = new FPGA(new DEPPI(szSel));
 	}
 
+	// Make certain we can talk to the FPGA
 	try {
 		unsigned v  = m_fpga->readio(R_VERSION);
-		if (v < 0x20160000) {
+		if (v < 0x20170000) {
 			fprintf(stderr, "Could not communicate with board (invalid version)\n");
 			exit(EXIT_FAILURE);
 		}
@@ -442,72 +232,69 @@ int main(int argc, char **argv) {
 
 	// First, see if we need to load a bit file
 	if (bitfile) {
-		int	len;
-		FILE	*fp = fopen(bitfile, "rb");
 
-		fseek(fp, 0x5dl, SEEK_SET);
-		len = fread(&fbuf[CONFIG_ADDRESS-SPIFLASH],
+		fp = fopen(bitfile, "r");
+		if (strcmp(&argv[argn][strlen(argv[argn])-4],".bit")==0)
+			skip_bitfile_header(fp);
+		bitsz = fread(&fbuf[CONFIG_ADDRESS-SPIFLASH],
 				sizeof(fbuf[0]),
-				FLASHWORDS-(CONFIG_ADDRESS-SPIFLASH), fp);
-		assert(len + CONFIG_ADDRESS < ALTCONFIG_ADDRESS);
+				FLASHLEN - (CONFIG_ADDRESS-SPIFLASH), fp);
 		fclose(fp);
 
-		for(int i=0; i<4; i++) {
-			// printf("0x%08x\n", fbuf[i]);
-			assert(fbuf[i] == 0x0ffffffff);
-		} // printf("0x%08x\n", fbuf[4]);
-		assert(fbuf[4] == 0x0665599aa);
-
-		printf("Loading: %s\n", bitfile);
-		if ((flash)&&(!flash->write(CONFIG_ADDRESS, len, &fbuf[CONFIG_ADDRESS-SPIFLASH], true))) {
-			fprintf(stderr, "Could not write primary bitfile\n");
-			exit(EXIT_FAILURE);
-		}
-	} if (altbitfile) {
-		int	len;
-		FILE	*fp = fopen(altbitfile, "rb");
-
-		// The alternate configuration follows the first configuration
-		len = fread(&fbuf[ALTCONFIG_ADDRESS-SPIFLASH],
-				sizeof(fbuf[0]),
-				FLASHWORDS-(ALTCONFIG_ADDRESS-SPIFLASH), fp);
-		assert(len + ALTCONFIG_ADDRESS < RESET_ADDRESS);
-		fclose(fp);
-		printf("Loading: %s\n", altbitfile);
-
-		if ((flash)&&(!flash->write(ALTCONFIG_ADDRESS, len, &fbuf[ALTCONFIG_ADDRESS-SPIFLASH], true))) {
-			fprintf(stderr, "Could not write alternate bitfile\n");
-			exit(EXIT_FAILURE);
+		try {
+			printf("Loading: %s\n", bitfile);
+			flash->write(CONFIG_ADDRESS, bitsz, fbuf, true);
+		} catch(BUSERR b) {
+			fprintf(stderr, "BUS-ERR @0x%08x\n", b.addr);
+			exit(-1);
 		}
 	}
 
-	if (codef) try {
-		SECTION	**secpp = NULL, *secp;
+	// Then see if we were given an alternate bit file
+	if (altbitfile) {
+		size_t	altsz;
+		assert(CONFIG_ADDRESS + bitsz < ALTCONFIG_ADDRESS);
 
-		if(iself(codef)) {
+		fp = fopen(altbitfile, "r");
+		if (strcmp(&argv[argn][strlen(argv[argn])-4],".bit")==0)
+			skip_bitfile_header(fp);
+		altsz = fread(&fbuf[ALTCONFIG_ADDRESS-SPIFLASH],
+				sizeof(fbuf[0]),
+				FLASHLEN-(ALTCONFIG_ADDRESS-SPIFLASH), fp);
+		assert(ALTCONFIG_ADDRESS+altsz < RESET_ADDRESS);
+		fclose(fp);
+
+		try {
+			printf("Loading: %s\n", altbitfile);
+			flash->write(ALTCONFIG_ADDRESS, altsz, fbuf, true);
+		} catch(BUSERR b) {
+			fprintf(stderr, "BUS-ERR @0x%08x\n", b.addr);
+			exit(-1);
+		}
+	} else {
+		assert(CONFIG_ADDRESS+bitsz < RESET_ADDRESS);
+	}
+
+	if (execfile) try {
+		ELFSECTION	**secpp = NULL, *secp;
+
+		if(iself(execfile)) {
 			// zip-readelf will help with both of these ...
-			elfread(codef, entry, secpp);
+			elfread(execfile, entry, secpp);
 			assert(entry == RESET_ADDRESS);
-		} else if (permit_raw_files) {
-			secpp = rawsection(codef);
-			entry = RESET_ADDRESS;
 		} else {
-			fprintf(stderr, "ERR: %s is not in ELF format\n", codef);
+			fprintf(stderr, "ERR: %s is not in ELF format\n", execfile);
 			exit(EXIT_FAILURE);
 		}
 
-		printf("Loading: %s\n", codef);
+		printf("Loading: %s\n", execfile);
 		// assert(secpp[1]->m_len = 0);
 		for(int i=0; secpp[i]->m_len; i++) {
 			bool	valid = false;
 			secp=  secpp[i];
 			if ((secp->m_start >= RESET_ADDRESS)
 				&&(secp->m_start+secp->m_len
-						<= SPIFLASH+FLASHWORDS))
-				valid = true;
-			if ((secp->m_start >= RAMBASE)
-				&&(secp->m_start+secp->m_len
-						<= RAMBASE+MEMWORDS))
+						<= SPIFLASH+FLASHLEN))
 				valid = true;
 			if (!valid) {
 				fprintf(stderr, "No such memory on board: 0x%08x - %08x\n",
@@ -519,28 +306,18 @@ int main(int argc, char **argv) {
 		unsigned	startaddr = RESET_ADDRESS, codelen = 0;
 		for(int i=0; secpp[i]->m_len; i++) {
 			secp = secpp[i];
-			if ((secp->m_start >= RAMBASE)
-				&&(secp->m_start+secp->m_len
-						<= RAMBASE+MEMWORDS)) {
-				for(int i=0; (unsigned)i<secp->m_len; i++) {
-					if (secp->m_data[i] != 0) {
-						fprintf(stderr, "ERR: Cannot set RAM upon bootup!\n");
-						fprintf(stderr, "(The bootloaders just not that smart ... yet)\n");
-						fprintf(stderr, "Attempting to set %08x - %08x\n", secp->m_start, secp->m_start+secp->m_len-1);
-						fprintf(stderr, "%08x cannot be set to %08x\n", secp->m_start+i, secp->m_data[i]);
-						exit(EXIT_FAILURE);
-					}
-				}
-			} else {
+
+			// We only ever write to the flash
 				if (secp->m_start < startaddr) {
+					// Keep track of the first address in
+					// flash, as well as the last address
+					// that we will write
 					codelen += (startaddr-secp->m_start);
 					startaddr = secp->m_start;
 				} if (secp->m_start+secp->m_len > startaddr+codelen) {
 					codelen = secp->m_start+secp->m_len-startaddr;
 				} memcpy(&fbuf[secp->m_start-SPIFLASH],
-					secp->m_data, 
-					secp->m_len*sizeof(FPGA::BUSW));
-			}
+					secp->m_data, secp->m_len);
 		}
 		if ((flash)&&(!flash->write(startaddr, codelen, &fbuf[startaddr-SPIFLASH], true))) {
 			fprintf(stderr, "ERR: Could not write program to flash\n");
@@ -551,13 +328,8 @@ int main(int argc, char **argv) {
 		if (m_fpga) m_fpga->readio(R_VERSION); // Check for bus errors
 
 		// Now ... how shall we start this CPU?
-		printf("The CPU should be fully loaded, you may now start\n");
-		printf("it.  To start the CPU, either toggle power or type\n");
-		printf("%% wbregs fpgagen1 0 \n");
-		printf("%% wbregs fpgagen2 0x0300 \n");
-		printf("%% wbregs fpgacmd  14 \n");
 	} catch(BUSERR a) {
-		fprintf(stderr, "XULA-BUS error: %08x\n", a.addr);
+		fprintf(stderr, "S6-BUS error: %08x\n", a.addr);
 		exit(-2);
 	}
 
