@@ -52,14 +52,67 @@
 #include "llcomms.h"
 #include "deppi.h"
 
-DEPPI::DEPPI(char *szSel) {
-	if (!DmgrOpen(&m_dev, szSel)) {
-		fprintf(stderr, "Open failed!\n");
+FILE	*dbgfp = stderr;
+
+DEPPI::DEPPI(const char *szSel) {
+	if ((!szSel)||(szSel[0] == '\0')) {
+		// Number of digilent devcies on a system
+		int	pcdvc;
+
+		// Go fish and try to find the device
+		DmgrEnumDevices(&pcdvc);
+
+		if (pcdvc < 0) {
+			depperr();
+			exit(EXIT_FAILURE);
+		}
+
+		//
+		int	found = 0; // Number of devices found mtg our criteria
+		DVC	dvcinfo; // A structure to receive device info
+		int	foundid=-1; // The id number of the device we found
+
+		//
+		for(int devid=0; devid < pcdvc; devid++) {
+			DmgrGetDvc(devid, &dvcinfo);
+			// fprintf(dbgfp, "DEVICE NAME: %s\n", dvcinfo.szName);
+			if (strcmp(dvcinfo.szName, "CmodS6")==0) {
+				found++;
+				// fprintf(dbgfp, "Found a CMOD!\n");
+				foundid = devid;
+			}
+		}
+
+		if (found == 0) {
+			fprintf(stderr, "No CModS6 devices found\n");
+			exit(EXIT_FAILURE);
+		} else if (found > 1) {
+			fprintf(stderr, "More than one CModS6 device found.  Please consider opening your\n");
+			fprintf(stderr, "device with a valid serial number instead.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		DmgrGetDvc(foundid, &dvcinfo);
+		if (!DmgrOpen(&m_dev, dvcinfo.szConn)) {
+			fprintf(stderr, "Could not open device!\n");
+			depperr();
+			exit(EXIT_FAILURE);
+		}
+
+		//
+		DmgrFreeDvcEnum();
+	} else if (!DmgrOpen(&m_dev, (char *)szSel)) {
+		// We know the device serial number, so go open that particular
+		// device
+		fprintf(stderr, "Named device open (DmgrOpen) failed!\n");
+		depperr();
 		exit(EXIT_FAILURE);
 	}
 
 	if (!DeppEnable(m_dev)) {
-		fprintf(stderr, "Could not enable DEPP interface\n");
+		fprintf(stderr, "Could not enable DEPP interface to (opened) device\n");
+
+		depperr();
 		exit(EXIT_FAILURE);
 	}
 
@@ -83,10 +136,15 @@ void	DEPPI::close(void) {
 void	DEPPI::depperr(void) {
 	ERC	erc = DmgrGetLastError();
 	if(erc != ercNoErc) {
-		char scode[cchErcMax], msg[cchErcMsgMax];
-		DmgrSzFromErc(erc, scode, msg);
-		fprintf(stderr, "ErrCode   : %s\n", scode);
-		fprintf(stderr, "ErrMessage: %s\n", msg);
+		char scode[cchErcMax], smsg[cchErcMsgMax];
+		DmgrSzFromErc(erc, scode, smsg);
+		fprintf(stderr, "ErrCode(%d): %s\n", erc, scode);
+		fprintf(stderr, "ErrMessage: %s\n", smsg);
+
+		if (erc == ercCapabilityConflict) {
+			fprintf(stderr, "Do you have the hardware manager in Vivado open?\n");
+			fprintf(stderr, "That could cause this conflict.\n");
+		}
 		close();
 		exit(EXIT_FAILURE);
 	}
@@ -94,8 +152,9 @@ void	DEPPI::depperr(void) {
 
 void	DEPPI::write(char *buf, int len) {
 	bool	good = true;
+	const bool	dbg = false;
 
-	if (false) {
+	if (dbg) {
 		// Debug code--write one at a time
 		fputs("WR: ", stdout);
 		for(int i=0; i<len; i++) {
@@ -115,10 +174,11 @@ int	DEPPI::read(char *buf, int len) {
 int	DEPPI::read(char *buf, int len, int timeout_ms) {
 	int	left = len, nr=0;
 	struct	timespec	now, later;
+	const	bool	dbg = false;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	// printf("USBI::read(%d) (FIFO is %d-%d)\n", len, m_rend, m_rbeg);
+	if (dbg) fprintf(dbgfp, "USBI::read(%d) (FIFO is %d-%d)\n", len, m_rend, m_rbeg);
 	nr = pop_fifo(buf, left);
 	left -= nr;
 	
@@ -127,7 +187,7 @@ int	DEPPI::read(char *buf, int len, int timeout_ms) {
 		nr = pop_fifo(&buf[len-left], left);
 		left -= nr;
 
-		// printf("\tWHILE (nr = %d, LEFT = %d, len=%d)\n", nr, left, len);
+		if (dbg) fprintf(dbgfp, "\tWHILE (nr = %d, LEFT = %d, len=%d)\n", nr, left, len);
 		if (nr == 0)
 			break;
 #define	TIMEOUT
@@ -151,7 +211,7 @@ int	DEPPI::read(char *buf, int len, int timeout_ms) {
 #endif
 	}
 
-	// printf("READ %d characters (%d req, %d left)\n", len-left, len, left);
+	if(dbg) fprintf(dbgfp, "READ %d characters (%d req, %d left)\n", len-left, len, left);
 	return len-left;
 }
 
@@ -159,7 +219,10 @@ void	DEPPI::raw_read(const int clen, int timeout_ms) {
 	int	empty = RCV_BUFMASK - ((m_rbeg - m_rend)&(RCV_BUFMASK));
 	int	len = clen;
 	bool	good = true;
+	const	bool	dbg = false;
 
+
+	if (dbg) fprintf(dbgfp, "DEPPI::raw_read(len=%d)\n", clen);
 	if (len > empty)
 		len = empty;
 	if (len > 0) {
@@ -177,7 +240,7 @@ void	DEPPI::raw_read(const int clen, int timeout_ms) {
 			}
 		} else
 			good = good && DeppGetRegRepeat(m_dev, 0, (unsigned char *)m_rxbuf, ln, false);
-		// fprintf(stdout, "DEPP: Pushing to FIFO\n");
+		if(dbg) fprintf(dbgfp, "DEPP: Pushing to FIFO\n");
 		push_fifo(m_rxbuf, ln);
 		len -= ln;
 	}
@@ -187,31 +250,39 @@ void	DEPPI::raw_read(const int clen, int timeout_ms) {
 }
 
 void	DEPPI::flush_read(void) {
-	while(poll(4)) {
+	const	bool	dbg = false;
+
+	if (dbg)	fprintf(dbgfp, "DEPPI::FLUSH-READ()\n");
+
+	do {
 		m_rbeg = m_rend = 0;
-	}
+	} while(poll(4));
+
+	if (dbg)	fprintf(dbgfp, "DEPPI::FLUSH-READ() -- COMPLETE\n");
 }
 
 void	DEPPI::push_fifo(char *buf, int len) {
 	char	last = 0;
 	char	*sptr = buf;
+	const	bool	dbg = false;
 
-	// fprintf(stdout, "DEPP::PUSH(%d)\n", len);
+	if (dbg)  fprintf(dbgfp, "DEPP::PUSH(%d)\n", len);
 
 	if (m_rbeg != m_rend)
 		last = m_rbuf[(m_rbeg-1)&RCV_BUFMASK];
+	if (dbg)	fprintf(dbgfp, "DEPPI::PUSH() last=%d, rbeg=%d, rend=%d\n", last, m_rbeg, m_rend);
 	for(int i=0; i<len; i++) {
 		char v = *sptr++;
 		if (((v & 0x80)||((unsigned char)v < 0x10))&&(v == last)) {
 			// Skipp any stuff bytes
-			// fprintf(stderr, "SKIPPING-1: %02x\n", v & 0x0ff);
+			if (dbg)  fprintf(dbgfp, "SKIPPING-1: %02x\n", v & 0x0ff);
 		} else if ((unsigned char)v == 0x0ff) {
 			// Skipp any not-yet-ready bytes
-			// fprintf(stdout, "SKIPPING-2: %02x\n", 0x0ff);
+			if (dbg)  fprintf(dbgfp, "SKIPPING-2: %02x\n", 0x0ff);
 		} else {
 			m_rbuf[m_rbeg] = v;
-			// fprintf(stdout, "PUSHING: %02x %c\n", v&0x0ff,
-			//	isprint(v)?v:'.');
+			if (dbg) fprintf(dbgfp, "PUSHING: 0x%02x \'%c\'\n",
+				v&0x0ff, isprint(v)?v:'.');
 			m_rbeg = (m_rbeg+1)&(RCV_BUFMASK);
 		} last = v;
 	}
@@ -221,9 +292,10 @@ int	DEPPI::pop_fifo(char *buf, int len) {
 	int	avail = (m_rbeg - m_rend)&(RCV_BUFMASK);
 	int	left = len;
 	int	nr = 0;
+	const	bool	dbg = false;
 
-	// printf("Attempting to pop %d items from FIFO (%d - %d)\n",
-	// 		len, m_rend, m_rbeg);
+	if (dbg) fprintf(dbgfp, "Attempting to pop %d items from FIFO (%d - %d)\n",
+	 		len, m_rend, m_rbeg);
 	while((avail > 0)&&(left > 0)) {
 		int ln = RCV_BUFLEN-m_rend;
 		if (ln > left)
@@ -244,10 +316,11 @@ int	DEPPI::pop_fifo(char *buf, int len) {
 bool	DEPPI::poll(unsigned ms) {
 	int	avail = (m_rbeg-m_rend)&(RCV_BUFMASK);
 	bool	r = true;
+	const	bool	dbg = false;
 
-	// printf("POLL\n");
+	if (dbg) fprintf(dbgfp, "POLL\n");
 	if ((avail < 2)&&((avail<1)||(m_rbuf[m_rend]&0x80)||(m_rbuf[m_rend]<0x10))) {
-		// printf("POLL -- CALLS RAW READ\n");
+		if (dbg) fprintf(dbgfp, "POLL -- CALLS RAW READ\n");
 		raw_read(4,ms);
 		avail = (m_rbeg-m_rend)&(RCV_BUFMASK);
 
@@ -259,7 +332,7 @@ bool	DEPPI::poll(unsigned ms) {
 				if (avail == ((m_rbeg-m_rend)&(RCV_BUFMASK)))
 					break; // We didn't read anything more
 				avail = (m_rbeg-m_rend)&(RCV_BUFMASK);
-				// printf("POLL/LOOP -- %d available\n", avail);
+				if (dbg) fprintf(dbgfp, "POLL/LOOP -- %d available\n", avail);
 			}
 			if (avail < 1)
 				r = false;
@@ -267,7 +340,7 @@ bool	DEPPI::poll(unsigned ms) {
 				r = false;
 		} else r = false;
 	}
-	// printf("POLL -- is %s\n", (r)?"true":"false");
+	if (dbg) fprintf(dbgfp, "POLL -- is %s\n", (r)?"true":"false");
 
 	return r;
 }

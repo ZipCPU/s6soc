@@ -52,6 +52,9 @@
 #define	RCV_BUFLEN	512
 #define	RCV_BUFMASK	(RCV_BUFLEN-1)
 
+// #define	S6SN	"SN:210282768825"
+#define	S6SN	""
+
 #include "llcomms.h"
 
 class	DEPPI : public LLCOMMSI { // DEPP Interface
@@ -69,7 +72,7 @@ private:
 	void	depperr(void);
 
 public:
-	DEPPI(char *szSel);
+	DEPPI(const char *szSel);
 	~DEPPI(void);
 
 	virtual	void	close(void);
