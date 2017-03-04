@@ -78,16 +78,14 @@ const	REGNAME	raw_bregs[] = {
 	{ R_QSPI_IDREG, "QSPIID"		},
 	{ R_QSPI_IDREG, "QSPII"			},
 	//
-	{ R_CLOCK,	"CLOCK"			},
-	{ R_CLOCK,	"TIME"			},
-	{ R_TIMER,	"TIMER"			},
-	{ R_STOPWATCH,	"STOPWACH"		},
-	{ R_STOPWATCH,	"STOPWATCH"		},
-	{ R_CKALARM,	"CKALARM"		},
-	{ R_CKALARM,	"ALARM"			},
-	// { R_DATE,	"DATE"			},
-	// Scopes are defined and come and go.  Be aware, therefore, not all
-	// of these scopes may be defined at the same time.
+	// The real-time-clock registers have been removed
+	//	(they never fit in the core)
+	//
+	// The real-time-date register has been removed
+	//	(it never fit either)
+	//
+	// The wishbone scope
+	//
 	{ R_SCOPE,	"SCOPE"			},
 	{ R_SCOPE,	"SCOP"			},
 	{ R_SCOPED,	"SCOPDATA"		},
@@ -95,43 +93,7 @@ const	REGNAME	raw_bregs[] = {
 	{ R_SCOPED,	"SCOPED"		},
 	{ R_SCOPED,	"SCOPD"			},
 	//
-	// For working with the ICAPE interface ... if I can ever get a
-	// testing environment suitable to prove that it works.
-	//
-	{ R_CFG_CRC,	"FPGACRC"		},
-	{ R_CFG_FAR_MAJ, "FPGAFARH"		},
-	{ R_CFG_FAR_MIN, "FPGAFARL"		},
-	{ R_CFG_FDRI,	"FPGAFDRI"		},
-	{ R_CFG_FDRO,	"FPGAFDRO"		},
-	{ R_CFG_CMD,	"FPGACMD"		},
-	{ R_CFG_CTL,	"FPGACTL"		},
-	{ R_CFG_MASK,	"FPGAMASK"		},
-	{ R_CFG_STAT,	"FPGASTAT"		},
-	{ R_CFG_LOUT,	"FPGALOUT"		},
-	{ R_CFG_COR1,	"FPGACOR1"		},
-	{ R_CFG_COR2,	"FPGACOR2"		},
-	{ R_CFG_PWRDN,	"FPGAPWRDN"		},
-	{ R_CFG_FLR,	"FPGAFLR"		},
-	{ R_CFG_IDCODE,	"FPGAIDCODE"		},
-	{ R_CFG_CWDT,	"FPGACWDT"		},
-	{ R_CFG_HCOPT,	"FPGAHCOPT"		},
-	{ R_CFG_CSBO,	"FPGACSBO"		},
-	{ R_CFG_GEN1,	"FPGAGEN1"		},
-	{ R_CFG_GEN2,	"FPGAGEN2"		},
-	{ R_CFG_GEN3,	"FPGAGEN3"		},
-	{ R_CFG_GEN4,	"FPGAGEN4"		},
-	{ R_CFG_GEN5,	"FPGAGEN5"		},
-	{ R_CFG_MODE,	"FPGAMODE"		},
-	{ R_CFG_GWE,	"FPGAGWE"		},
-	{ R_CFG_GTS,	"FPGAGTS"		},
-	{ R_CFG_MFWR,	"FPGAMFWR"		},
-	{ R_CFG_CCLK,	"FPGACCLK"		},
-	{ R_CFG_SEU,	"FPGASEU"		},
-	{ R_CFG_EXP,	"FPGAEXP"		},
-	{ R_CFG_RDBK,	"FPGARDBK"		},
-	{ R_CFG_BOOTSTS, "BOOTSTS"		},
-	{ R_CFG_EYE,	"FPGAEYE"		},
-	{ R_CFG_CBC,	"FPGACBC"		},
+	// The ICAPE interface registers have been removed.
 	//
 	{ RAMBASE,	"MEM"			},
 	{ SPIFLASH,	"FLASH"			}

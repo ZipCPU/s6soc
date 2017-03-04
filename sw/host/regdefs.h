@@ -4,14 +4,15 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	
+// Purpose:	This file defines C constants which can be used when
+//		communicating with the FPGA device from the PC host.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -38,78 +39,41 @@
 #ifndef	REGDEFS_H
 #define	REGDEFS_H
 
-#define	R_VERSION	0x00000108
-#define	R_ICONTROL	0x00000100
-#define	R_BUSERR	0x00000101
-#define	R_ITIMERA	0x00000102
-#define	R_ITIMERB	0x00000103
-#define	R_PWM		0x00000104
-#define	R_SPIO		0x00000105
-#define	R_GPIO		0x00000106
-#define	R_UART		0x00000107
+#define	R_ICONTROL	0x00000400
+#define	R_BUSERR	0x00000404
+#define	R_ITIMERA	0x00000408
+#define	R_ITIMERB	0x0000040c
+#define	R_PWM		0x00000410
+#define	R_SPIO		0x00000414
+#define	R_GPIO		0x00000418
+#define	R_UART		0x0000041c
+#define	R_VERSION	0x00000420
 
 // WB Scope registers
-#define	R_SCOPE		0x00000200
-#define	R_SCOPED	0x00000201
+#define	R_SCOPE		0x00000800
+#define	R_SCOPED	0x00000804
 //
 // And because the flash driver needs these constants defined ...
-#define	R_QSPI_EREG	0x0000030c
-#define	R_QSPI_CREG	0x0000030d
-#define	R_QSPI_SREG	0x0000030e
-#define	R_QSPI_IDREG	0x0000030f
+#define	R_QSPI_EREG	0x00000c00
+#define	R_QSPI_CREG	0x00000c04
+#define	R_QSPI_SREG	0x00000c08
+#define	R_QSPI_IDREG	0x00000c0c
 //
-// FPGA CONFIG/ICAP REGISTERS
-#define	R_CFG_CRC	0x00000400
-#define	R_CFG_FAR_MAJ	0x00000401
-#define	R_CFG_FAR_MIN	0x00000402
-#define	R_CFG_FDRI	0x00000403
-#define	R_CFG_FDRO	0x00000404
-#define	R_CFG_CMD	0x00000405
-#define	R_CFG_CTL	0x00000406
-#define	R_CFG_MASK	0x00000407
-#define	R_CFG_STAT	0x00000408
-#define	R_CFG_LOUT	0x00000409
-#define	R_CFG_COR1	0x0000040a
-#define	R_CFG_COR2	0x0000040b
-#define	R_CFG_PWRDN	0x0000040c
-#define	R_CFG_FLR	0x0000040d
-#define	R_CFG_IDCODE	0x0000040e
-#define	R_CFG_CWDT	0x0000040f
-#define	R_CFG_HCOPT	0x00000410
-#define	R_CFG_CSBO	0x00000412
-#define	R_CFG_GEN1	0x00000413
-#define	R_CFG_GEN2	0x00000414
-#define	R_CFG_GEN3	0x00000415
-#define	R_CFG_GEN4	0x00000416
-#define	R_CFG_GEN5	0x00000417
-#define	R_CFG_MODE	0x00000418
-#define	R_CFG_GWE	0x00000419
-#define	R_CFG_GTS	0x0000041a
-#define	R_CFG_MFWR	0x0000041b
-#define	R_CFG_CCLK	0x0000041c
-#define	R_CFG_SEU	0x0000041d
-#define	R_CFG_EXP	0x0000041e
-#define	R_CFG_RDBK	0x0000041f
-#define	R_CFG_BOOTSTS	0x00000420
-#define	R_CFG_EYE	0x00000421
-#define	R_CFG_CBC	0x00000422
-// RTC clock control
-#define	R_CLOCK		0x00000800
-#define	R_TIMER		0x00000801
-#define	R_STOPWATCH	0x00000802
-#define	R_CKALARM	0x00000803
 
 // RAM memory space
-#define	RAMBASE		0x00002000
-#define	MEMWORDS	(1<<12)
-#define	RAMLEN		MEMWORDS
+#define	LGMEMSZ		14
+#define	RAMBASE		(1<<LGMEMSZ)
+#define	MEMWORDS	(1<<(LGMEMSZ-1))
+#define	RAMLEN		(1<<LGMEMSZ)
 
 // Flash memory space
-#define	SPIFLASH	0x00400000
-#define	FLASHWORDS	(1<<22)
-#define	CONFIG_ADDRESS	0x00400000 // Main Xilinx configuration (ZipCPU)
-#define	ALTCONFIG_ADDRESS 0x440000 // Alternate Xilinx configuration (Debug)
-#define	RESET_ADDRESS	0x00480000 // ZipCPU Reset address
+#define	LGFLASHSZ	24		// Log_2 of the number of bytes in flash
+#define	SPIFLASH	(1<<LGFLASHSZ)
+#define	FLASHWORDS	(1<<(LGFLASHSZ-2))
+#define	FLASHLEN	(1<<LGFLASHSZ)
+#define	CONFIG_ADDRESS	  SPIFLASH // Main Xilinx configuration (ZipCPU)
+#define	ALTCONFIG_ADDRESS (SPIFLASH+0x100000) // Alt Xilinx config (Dbg)
+#define	RESET_ADDRESS	  (SPIFLASH+0x200000) // ZipCPU Reset address
 
 // Interrupt control constants
 #define	GIE		0x80000000	// Enable all interrupts
@@ -121,19 +85,24 @@
 // Flash control constants
 #define	ERASEFLAG	0x80000000
 #define	DISABLEWP	0x10000000
+#define	ENABLEWP	0x00000000
 
 // Sectors are defined as 64 kB (16 kW)
-#define	SZPAGE		64	// 256 bytes
-#define	PGLEN		64	// 256 bytes
+#define	SZPAGEB		256
+#define	PGLENB		256
+#define	SZPAGEW		64
+#define	PGLENW		64
 #define	NPAGES		256	// 64 kB sectors / 256 bytes is ...
-#define	SECTORSZ	(NPAGES * SZPAGE)
-#define	NSECTORS	(FLASHWORDS/SECTORSZ)	// 256 sectors
-#define	SECTOROF(A)	((A) & (-1<<14))	// 64 kB ea
-#define	PAGEOF(A)	((A) & (-1<<6))
+#define	SECTORSZB	(NPAGES * SZPAGEB)	// In bytes, not words!!
+#define	SECTORSZW	(NPAGES * SZPAGEW)	// In words
+#define	NSECTORS	(FLASHLEN/SECTORSZB)	// 256 sectors
+#define	SECTOROF(A)	((A) & (-1<<16))
+#define	PAGEOF(A)	((A) & (-1<<8))
 
 // Scop definition/sequences
 #define	SCOPE_NO_RESET	0x80000000
 #define	SCOPE_TRIGGER	(0x08000000|SCOPE_NO_RESET)
+#define	SCOPE_MANUAL	SCOPE_TRIGGER
 #define	SCOPE_DISABLE	(0x04000000)
 
 typedef	struct {
