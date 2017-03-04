@@ -25,7 +25,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -65,8 +65,8 @@ void	txval(int val);
 
 void entry(void) {
 	register IOSPACE	*sys = (IOSPACE *)0x0100;
-	char	dpymsg[16], *dpyptr;
-	char	uartmsg[40], *uartptr;
+	char	dpymsg[64], *dpyptr;
+	char	uartmsg[160], *uartptr;
 	int	newmsgtime = 0, leastmsgtime = -1, lstmsgtime = 0;
 
 	dpymsg[0] = 0;
@@ -85,7 +85,7 @@ void entry(void) {
 	lstmsgtime = newmsgtime;
 	while(1) {
 		int	seconds, pic;
-		const int	*sptr;
+		const short	*sptr;
 
 		// LED's off ... nothing to report
 		sys->io_spio = 0x0f0;
@@ -179,26 +179,12 @@ void entry(void) {
 
 		// DOORBELL!!!!!!
 		// Set the Display message
-		dpymsg[0] = (0x1b<<24)|('['<<16)|('j'<<8)|'D';
-		dpymsg[1] = ('o'<<24)|('o'<<16)|('r'<<8)|'b';
-		dpymsg[2] = ('e'<<24)|('l'<<16)|('l'<<8)|'!';
-		dpymsg[3] = 0;
+		strcpy(dpymsg, "a[jDoorbell!");
+		dpymsg[0] = 0x1b;
 		dpyptr = dpymsg;
 		// And the UART message / 18 characters
 		uartptr = uartmsg;
-		*uartptr++ = '\r'; *uartptr++ = '\n';
-		*uartptr++ = 'D';
-		*uartptr++ = 'o';
-		*uartptr++ = 'o';
-		*uartptr++ = 'r';
-		*uartptr++ = 'b';
-		*uartptr++ = 'e';
-		*uartptr++ = 'l';
-		*uartptr++ = 'l';
-		*uartptr++ = '!';
-		*uartptr++ = '\r'; *uartptr++ = '\n';
-		*uartptr++ = '\r'; *uartptr++ = '\n';
-		*uartptr++ = '\0';
+		strcat(uartptr, "\r\nDoorbell!\r\n\r\n");
 		uartptr = uartmsg;
 
 
@@ -207,6 +193,7 @@ void entry(void) {
 		sptr = sound_data;
 		sys->io_pwm_audio = 0x0310000; // Turn on the audio
 		while(sptr < &sound_data[NSAMPLE_WORDS]) {
+			unsigned	this_sample;
 			do {
 				pic = sys->io_pic;
 				if (pic & INT_TIMA) {
@@ -228,36 +215,10 @@ void entry(void) {
 				} else
 					sys->io_spio = 0x40;
 			} while((pic & INT_AUDIO)==0);
-			sys->io_pwm_audio = (*sptr >> 16)&0x0ffff;
+			this_sample = (*sptr++) & 0x0ffff;
+			sys->io_pwm_audio = this_sample;
 			// Now, turn off the audio interrupt since it doesn't
 			// reset itself ...
-			sys->io_pic = INT_AUDIO;
-
-			do {
-				pic = sys->io_pic;
-
-				if (pic & INT_TIMA) {
-					sys->io_pic = INT_TIMA;
-					seconds++;
-					rtcclock = rtcnext(rtcclock);
-				} if ((pic & INT_UARTTX)&&(*uartptr)) {
-					sys->io_uart = *uartptr++;
-					sys->io_pic = INT_UARTTX;
-					sys->io_spio = 0x22;
-				} else if (!*uartptr)
-					sys->io_spio = 0x20;
-				if (*dpyptr) {
-				// This will take a long time.  It should be an
-				// interruptable task ... but, sigh, we're not
-				// there yet.
-					dispchar(*dpyptr++);
-					sys->io_spio = 0x44;
-				} else
-					sys->io_spio = 0x40;
-			} while((pic & INT_AUDIO)==0);
-			sys->io_pwm_audio = (*sptr++) & 0x0ffff;
-
-			// and turn off the audio interrupt again ...
 			sys->io_pic = INT_AUDIO;
 		} sys->io_pic = INT_BUTTON;
 
@@ -279,33 +240,27 @@ void entry(void) {
 }
 
 void	build_dpymsg(char *msg, unsigned clk) {
-	*msg++ = (0x1b<<24)|('['<<16)|('j'<<8)|'C'; // Clear, and start 'C'
-	*msg++ = ('l'<<24)|('o'<<16)|('c'<<8)|'k';
-	*msg = (' '<<24)|(':'<<16)|(' '<<8);
+	msg[0] = 0x1b;
+	strcpy(++msg, "[jClock : ");
+	msg += strlen(msg);
+
 	if ((clk>>20)&0x0f)
 		*msg++ |= (((clk>>20)&0x0f)+'0');
 	else
 		*msg++ |= ' ';
-	*msg++ = ((((clk>>16)&0x0f)+'0')<<24)
-		|(':'<<16)
-		|((((clk>>12)&0x0f)+'0')<< 8)	// Minutes
-		|((((clk>> 8)&0x0f)+'0')    );
-	*msg++ = (':'<<24)
-		|((((clk>> 4)&0x0f)+'0')<<16)	// Seconds
-		|((((clk    )&0x0f)+'0')<< 8);
-	*msg++ = 0;
-	*msg++ = 0;
-	*msg++ = 0;
+	*msg++ = (((clk>>16)&0x0f)+'0');
+	*msg++ = ':';
+	*msg++ = (((clk>>12)&0x0f)+'0');
+	*msg++ = (((clk>> 8)&0x0f)+'0');
+	*msg++ = ':';
+	*msg++ = (((clk>> 4)&0x0f)+'0');
+	*msg++ = (((clk    )&0x0f)+'0');
 	*msg++ = 0;
 }
 
 void	build_uartmsg(char *msg, unsigned clk) {
-	*msg++ = 'T';			// 0
-	*msg++ = 'i';			// 1
-	*msg++ = 'm';			// 2
-	*msg++ = 'e';			// 3
-	*msg++ = ':';			// 4
-	*msg++ = ' ';
+	strcpy(msg, "Time: ");
+	msg += strlen(msg);
 	*msg++ = ((clk>>20)&0x03)+'0'; // Hrs
 	*msg++ = ((clk>>16)&0x0f)+'0';
 	*msg++ = ':';
@@ -330,8 +285,9 @@ void	showval(int val) {
 	}
 }
 
-void	txch(int val) {
+void	txch(char val) {
 	register IOSPACE	*sys = (IOSPACE *)0x0100;
+	unsigned v = (unsigned char)val;
 
 	// To read whether or not the transmitter is ready, you must first
 	// clear the interrupt bit.
@@ -343,7 +299,7 @@ void	txch(int val) {
 	// is ready.  Otherwise, wait until the transmitter becomes ready.
 	while((sys->io_pic&INT_UARTTX)==0)
 		;
-	sys->io_uart = (val&0x0ff);
+	sys->io_uart = (v&0x0ff);
 	// Give the transmitter a chance to finish, and then to create an
 	// interrupt when done
 	sys->io_pic = INT_UARTTX;

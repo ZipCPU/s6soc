@@ -22,7 +22,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -67,10 +67,12 @@ void entry(void) {
 
 		ptr = msg;
 		while(*ptr) {
+			unsigned iv = *(unsigned char *)ptr++;
+
 			// Wait while our transmitter is busy
 			while((sys->io_pic & INT_UARTTX)==0)
 				;
-			sys->io_uart = *ptr++; // Transmit our character
+			sys->io_uart = iv; // Transmit our character
 			sys->io_pic  = INT_UARTTX; // Clear the int flag
 		}
 

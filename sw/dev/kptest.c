@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -41,13 +41,14 @@
 
 void    txchr(char v) {
         volatile IOSPACE        *sys = (IOSPACE *)IOADDR;
-        if (v < 10)
+	unsigned x = v & 0x07f;
+
+        if (x < 10)
                 return;
-        v &= 0x07f;
         sys->io_pic = INT_UARTTX;
         while((sys->io_pic&INT_UARTTX)==0)
                 ;
-        sys->io_uart = v;
+        sys->io_uart = x;
 }
 
 void    txstr(const char *str) {

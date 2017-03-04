@@ -11,7 +11,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -41,14 +41,14 @@
 #include "../zipos/kfildes.h"
 #endif
 
-static const int keymap[] = {
+static const char keymap[] = {
 	0x01,0x02,0x03,0x0a,
 	0x04,0x05,0x06,0x0b,
 	0x07,0x08,0x09,0x0c,
 	0x00,0x0f,0x0e,0x0d
 };
 
-int	keypadread(void) {
+char	keypadread(void) {
 	int	row, col, key;
 	IOSPACE	*sys = (IOSPACE *)IOADDR;
 
@@ -125,14 +125,14 @@ void	keypad_wait_for_release(void) {
 
 #ifdef ZIPOS
 void keypad_task(void) {
-	clear(INT_KEYPAD);
+	clear(INT_KEYPAD, 0);
 	while(1) {
 		int	key;
 		wait(INT_KEYPAD,-1); // Automatically clears
 		key = keypadread();
 		write(FILENO_STDOUT, &key, 1);
 		// Prepare for the next key
-		clear(INT_KEYPAD);
+		clear(INT_KEYPAD, 0);
 	}
 }
 #endif

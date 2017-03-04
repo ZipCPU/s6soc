@@ -12,7 +12,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -53,16 +53,16 @@ void entry(void) {
 	sys->io_pwm_audio = 0x0110000;
 	while(1) {
 		int	seconds = 0, pic;
-		const int	*ptr;
+		const unsigned short	*ptr;
 		const char	*mptr = msg;
 		sys->io_tima = TM_ONE_SECOND | TM_REPEAT; // Ticks per second, 80M
 
 		sys->io_spio = 0x0f0;
-		ptr = sound_data;
+		ptr = (const unsigned short *)sound_data;
 		sys->io_pwm_audio = 0x0310000;
-		if (ptr == sound_data)
-			sys->io_spio = 0x0f1;
-		while(ptr < &sound_data[NSAMPLE_WORDS]) {
+		sys->io_spio = 0x0f1;
+		while(ptr <(const unsigned short *)&sound_data[NSAMPLE_WORDS]) {
+			unsigned	this_sample;
 			sys->io_spio = 0x022;
 			do {
 				pic = sys->io_pic;
@@ -72,24 +72,12 @@ void entry(void) {
 					sys->io_uart = *mptr++;
 				sys->io_pic = (pic & 0x07fff);
 			} while((pic & INT_AUDIO)==0);
-			sys->io_pwm_audio = (*ptr >> 16)&0x0ffff;
+			this_sample = (*ptr++); // & 0x0ffff;
+			sys->io_pwm_audio = this_sample;
 			// Now, turn off the audio interrupt since it doesn't
 			// reset itself ...
 			sys->io_pic = INT_AUDIO;
-
-			do {
-				pic = sys->io_pic;
-				if (pic & INT_TIMA)
-					seconds++;
-				if ((pic & INT_UARTTX)&&(*mptr))
-					sys->io_uart = *mptr++;
-				sys->io_pic = (pic & 0x07fff);
-			} while((pic & INT_AUDIO)==0);
-			sys->io_pwm_audio = (*ptr++) & 0x0ffff;
-
-			// and turn off the audio interrupt again ...
-			sys->io_pic = INT_AUDIO;
-		} if (ptr >= &sound_data[NSAMPLE_WORDS])
+		} if (ptr >= (const unsigned short *)&sound_data[NSAMPLE_WORDS])
 			sys->io_spio = 0x044;
 
 		sys->io_spio = 0x088;

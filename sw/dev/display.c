@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -55,43 +55,28 @@ static void	dispwait(void) {
 	} while(i-->0);
 }
 
-void	dispchar(int ch) {
+void	dispchar(char ch) {
 	if (!ch) // Don't display null characters
 		return;
-	if (ch&(~0x0ff)) { // Multiple characters to display
-		int	v = (ch>>24)&0x0ff;
-		if (v) {
-			dispchar(v);
-			v = (ch>>16)&0x0ff;
-			if (v) {
-				dispchar(v);
-				v = (ch>> 8)&0x0ff;
-				if (v) {
-					dispchar(v);
-					dispchar(ch&0x0ff);
-				}
-			}
-		}
-	} else {
-		IOSPACE	*sys = (IOSPACE *)IOADDR;
-		// Send the character
-		for(int i=0; i<8; i++) {
-			int gpiov = GPOCLRV(GPO_MOSI|GPO_SCK|GPO_SS);
-			if (ch&0x80)
-				gpiov |= GPOSETV(GPO_MOSI);
-			sys->io_gpio = gpiov;
-			dispwait();
-			sys->io_gpio = GPOSETV(GPO_SCK);
-			dispwait();
-			ch<<=1;
-		}
-		// Turn off the clock
-		sys->io_gpio = GPOCLRV(GPO_SCK);
+	IOSPACE	*sys = (IOSPACE *)IOADDR;
+	// Send the character
+	for(int i=0; i<8; i++) {
+		int gpiov = GPOCLRV(GPO_MOSI|GPO_SCK|GPO_SS);
+		if (ch&0x80)
+			gpiov |= GPOSETV(GPO_MOSI);
+		sys->io_gpio = gpiov;
 		dispwait();
-		// Then the port
-		sys->io_gpio = GPOSETV(GPO_SS);
+		sys->io_gpio = GPOSETV(GPO_SCK);
 		dispwait();
+		ch<<=1;
 	}
+
+	// Turn off the clock
+	sys->io_gpio = GPOCLRV(GPO_SCK);
+	dispwait();
+	// Then the port
+	sys->io_gpio = GPOSETV(GPO_SS);
+	dispwait();
 }
 
 #ifdef	ZIPOS

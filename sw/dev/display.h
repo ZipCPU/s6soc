@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -40,8 +40,7 @@
 #ifndef	DISPLAY_H
 #define	DISPLAY_H
 
-#define	PACK(A,B,C,D)	(((A)<<24)|((B)<<16)|((C)<<8)|(D))
-extern void	dispchar(int ch);
+extern void	dispchar(char ch);
 
 #ifdef	ZIPOS
 extern void	displaytask(void);
