@@ -1,22 +1,21 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	wbscope.v
 //
-// Project:	FPGA Library of Routines
+// Project:	WBScope, a wishbone hosted scope
 //
 // Purpose:	This is a generic/library routine for providing a bus accessed
-//		'scope' or (perhaps more appropriately) a bus accessed logic
-//		analyzer.  The general operation is such that this 'scope' can
-//		record and report on any 32 bit value transiting through the
-//		FPGA.  Once started and reset, the scope records a copy of the
-//		input data every time the clock ticks with the circuit enabled.
-//		That is, it records these values up until the trigger.  Once
-//		the trigger goes high, the scope will record for bw_holdoff
-//		more counts before stopping.  Values may then be read from the
-//		buffer, oldest to most recent.  After reading, the scope may
-//		then be reset for another run.
+//	'scope' or (perhaps more appropriately) a bus accessed logic analyzer.
+//	The general operation is such that this 'scope' can record and report
+//	on any 32 bit value transiting through the FPGA.  Once started and
+//	reset, the scope records a copy of the input data every time the clock
+//	ticks with the circuit enabled.  That is, it records these values up
+//	until the trigger.  Once the trigger goes high, the scope will record
+//	for bw_holdoff more counts before stopping.  Values may then be read
+//	from the buffer, oldest to most recent.  After reading, the scope may
+//	then be reset for another run.
 //
-//		In general, therefore, operation happens in this fashion:
+//	In general, therefore, operation happens in this fashion:
 //		1. A reset is issued.
 //		2. Recording starts, in a circular buffer, and continues until
 //		3. The trigger line is asserted.
@@ -58,9 +57,9 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -73,7 +72,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -81,12 +80,16 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-/////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//
 module wbscope(i_clk, i_ce, i_trigger, i_data,
 	i_wb_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 	o_wb_ack, o_wb_stall, o_wb_data,
 	o_interrupt);
-	parameter	LGMEM = 5'd10, BUSW = 32, SYNCHRONOUS=1;
+	parameter	LGMEM = 5'd10, BUSW = 32, SYNCHRONOUS=1,
+			DEFAULT_HOLDOFF = ((1<<(LGMEM-1))-4),
+			HOLDOFFBITS = 20;
 	// The input signals that we wish to record
 	input				i_clk, i_ce, i_trigger;
 	input		[(BUSW-1):0]	i_data;
@@ -108,10 +111,10 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	wire		bw_reset_request, bw_manual_trigger,
 			bw_disable_trigger, bw_reset_complete;
 	reg	[22:0]	br_config;
-	wire	[19:0]	bw_holdoff;
-	initial	br_config = ((1<<(LGMEM-1))-4);
+	wire	[(HOLDOFFBITS-1):0]	bw_holdoff;
+	initial	br_config = DEFAULT_HOLDOFF;
 	always @(posedge i_wb_clk)
-		if ((i_wb_cyc)&&(i_wb_stb)&&(~i_wb_addr))
+		if ((i_wb_stb)&&(~i_wb_addr))
 		begin
 			if (i_wb_we)
 				br_config <= { i_wb_data[31],
@@ -123,7 +126,7 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	assign	bw_reset_request   = (~br_config[22]);
 	assign	bw_manual_trigger  = (br_config[21]);
 	assign	bw_disable_trigger = (br_config[20]);
-	assign	bw_holdoff         = br_config[19:0];
+	assign	bw_holdoff         = br_config[(HOLDOFFBITS-1):0];
 
 	wire	dw_reset, dw_manual_trigger, dw_disable_trigger;
 	generate
@@ -135,7 +138,8 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 		assign	bw_reset_complete = bw_reset_request;
 	end else begin
 		reg		r_reset_complete;
-		reg	[2:0]	r_iflags, q_iflags;
+		(* ASYNC_REG = "TRUE" *) reg	[2:0]	q_iflags;
+		reg	[2:0]	r_iflags;
 
 		// Resets are synchronous to the bus clock, not the data clock
 		// so do a clock transfer here
@@ -152,7 +156,8 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 		assign	dw_manual_trigger = r_iflags[1];
 		assign	dw_disable_trigger = r_iflags[0];
 
-		reg	q_reset_complete, qq_reset_complete;
+		(* ASYNC_REG = "TRUE" *) reg	q_reset_complete;
+		reg	qq_reset_complete;
 		// Pass an acknowledgement back from the data clock to the bus
 		// clock that the reset has been accomplished
 		initial	q_reset_complete = 1'b0;
@@ -189,24 +194,35 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	// Determine when memory is full and capture is complete
 	//
 	// Writes take place on the data clock
+	reg	[(HOLDOFFBITS-1):0]	counter;	// This is unsigned
+	reg	less_than_holdoff;
+	always @(posedge i_clk)
+		if (dw_reset)
+			less_than_holdoff <= 1'b1;
+		else if (i_ce)
+			less_than_holdoff <= (counter < bw_holdoff);
+
 	reg		dr_stopped;
-	reg	[19:0]	counter;	// This is unsigned
+	(* ASYNC_REG="TRUE" *) reg	[19:0]	counter;// This is unsigned
 	initial	dr_stopped = 1'b0;
-	initial	counter = 20'h0000;
+	initial	counter = 0;
 	always @(posedge i_clk)
 		if (dw_reset)
 		begin
 			counter <= 0;
-			dr_stopped <= 1'b0;
-		end else if ((i_ce)&&(dr_triggered))
+		else if ((i_ce)&&(dr_triggered)&&(~dr_stopped))
 		begin // MUST BE a < and not <=, so that we can keep this w/in
 			// 20 bits.  Else we'd need to add a bit to comparison 
 			// here.
-			if (counter < bw_holdoff)
-				counter <= counter + 20'h01;
-			else
-				dr_stopped <= 1'b1;
+			counter <= counter + 20'h01;
 		end
+	always @(posedge i_clk)
+		if ((~dr_triggered)||(dw_reset))
+			dr_stopped <= 1'b0;
+		else if (i_ce)
+			dr_stopped <= (counter+20'd1 >= bw_holdoff);
+		else
+			dr_stopped <= (counter >= bw_holdoff);
 
 	//
 	//	Actually do our writes to memory.  Record, via 'primed' when
@@ -226,14 +242,14 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 		begin
 			waddr <= 0; // upon reset.
 			dr_primed <= 1'b0;
-		end else if ((i_ce)&&((~dr_triggered)||(counter < bw_holdoff)))
+		end else if ((i_ce)&&(!dr_stopped))
 		begin
 			// mem[waddr] <= i_data;
 			waddr <= waddr + {{(LGMEM-1){1'b0}},1'b1};
 			dr_primed <= (dr_primed)||(&waddr);
 		end
 	always @(posedge i_clk)
-		if ((i_ce)&&((~dr_triggered)||(counter < bw_holdoff)))
+		if ((i_ce)&&(!dr_stopped))
 			mem[waddr] <= i_data;
 
 	//
@@ -252,7 +268,8 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 		// for many clocks.  Swapping is thus easy--two flip flops to
 		// protect against meta-stability and we're done.
 		//
-		reg	[2:0]	q_oflags, r_oflags;
+		(* ASYNC_REG = "TRUE" *) reg	[2:0]	q_oflags;
+		reg	[2:0]	r_oflags;
 		initial	q_oflags = 3'h0;
 		initial	r_oflags = 3'h0;
 		always @(posedge i_wb_clk)
@@ -274,14 +291,14 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	reg	br_wb_ack;
 	initial	br_wb_ack = 1'b0;
 	wire	bw_cyc_stb;
-	assign	bw_cyc_stb = ((i_wb_cyc)&&(i_wb_stb));
+	assign	bw_cyc_stb = (i_wb_stb);
 	always @(posedge i_wb_clk)
 	begin
 		if ((bw_reset_request)
 			||((bw_cyc_stb)&&(i_wb_addr)&&(i_wb_we)))
 			raddr <= 0;
 		else if ((bw_cyc_stb)&&(i_wb_addr)&&(~i_wb_we)&&(bw_stopped))
-			raddr <= raddr + {{(LGMEM-1){1'b0}},1'b1}; // Data read, when stopped
+			raddr <= raddr + 1'b1; // Data read, when stopped
 
 		if ((bw_cyc_stb)&&(~i_wb_we))
 		begin // Read from the bus
@@ -299,6 +316,12 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 			(((bw_cyc_stb)&&(i_wb_addr)&&(~i_wb_we)) ?
 				{{(LGMEM-1){1'b0}},1'b1} : { (LGMEM){1'b0}} )];
 
+	wire	[19:0]	full_holdoff;
+	assign full_holdoff[(HOLDOFFBITS-1):0] = bw_holdoff;
+	generate if (HOLDOFFBITS < 20)
+		assign full_holdoff[19:(HOLDOFFBITS)] = 0;
+	endgenerate
+
 	wire	[4:0]	bw_lgmem;
 	assign		bw_lgmem = LGMEM;
 	always @(posedge i_wb_clk)
@@ -311,7 +334,7 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 					bw_disable_trigger,
 					(raddr == {(LGMEM){1'b0}}),
 					bw_lgmem,
-					bw_holdoff  };
+					full_holdoff  };
 		else if (~bw_stopped) // read, prior to stopping
 			o_wb_data <= i_data;
 		else // if (i_wb_addr) // Read from FIFO memory
