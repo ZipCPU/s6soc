@@ -39,20 +39,22 @@
 ##
 ##
 all:
-PROGRAMS := wbregs readflash zipload buildsamples dumpuart
+PROGRAMS := wbregs readflash zipload dumpuart
 all: $(PROGRAMS)
 
 CXX := g++
 OBJDIR := obj-pc
 # BUSSRCS:= deppbus.cpp regdefs.cpp
-BUSSRCS:= deppi.cpp regdefs.cpp llcomms.cpp ttybus.cpp
-SOURCES:= wbregs.cpp readflash.cpp zipload.cpp flashdrvr.cpp # flashload.cpp/ziprun.cpp
+BUSSRCS:= deppi.cpp regdefs.cpp llcomms.cpp ttybus.cpp byteswap.cpp
+CPUSRCS:= zipelf.cpp
+SOURCES:= wbregs.cpp readflash.cpp zipload.cpp flashdrvr.cpp
+ALLSRCS:= $(SOURCES) $(CPUSRCS) $(BUSSRCS)
 ADEPT := ../../../refs/digilent.adept.sdk_2.3.1
 HEADERS:= deppbus.h devbus.h flashdrvr.h regdefs.h twoc.h
-OBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
+OBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(ALLSRCS)))
 BUSOBJS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(BUSSRCS)))
 CFLAGS := -g -Wall -I$(ADEPT)/inc -I.
-LIBS := -L /usr/lib64/digilent/adept -ldmgr -ldepp
+LIBS := -L /usr/local/lib64/digilent/adept -ldmgr -ldepp -ldpcomm -ldftd2xx -ldabs
 
 %.o: $(OBJDIR)/ $(OBJDIR)/%.o
 $(OBJDIR)/%.o: %.cpp
@@ -71,18 +73,15 @@ scope: $(OBJDIR)/scope.o $(BUSOBJS)
 readflash: $(OBJDIR)/readflash.o $(BUSOBJS)
 	$(CXX) $(CFLAGS) $^ $(LIBS) -o $@
 
-zipload: $(OBJDIR)/zipload.o $(OBJDIR)/flashdrvr.o $(BUSOBJS)
+zipload: $(OBJDIR)/zipload.o $(OBJDIR)/flashdrvr.o $(BUSOBJS) $(OBJDIR)/zipelf.o
 	$(CXX) $(CFLAGS) $^ $(LIBS) -lelf -o $@
-
-buildsamples: buildsamples.cpp
-	$(CXX) $(CFLAGS) $^ -o $@
 
 dumpuart: dumpuart.cpp
 	$(CXX) $(CFLAGS) $^ -o $@
 
 define	build-depends
 	@echo "Building dependency file(s)"
-	@$(CXX) $(CFLAGS) -MM $(SOURCES) $(BUSSRCS) > $(OBJDIR)/xdepends.txt
+	@$(CXX) $(CFLAGS) -MM $(ALLSRCS) > $(OBJDIR)/xdepends.txt
 	@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
 	@rm $(OBJDIR)/xdepends.txt
 endef
