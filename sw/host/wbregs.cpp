@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
 		nm = "no name";
 
 	char	szSel[64];
-	strcpy(szSel, "SN:210282768825");
+	strcpy(szSel, S6SN);
 	m_fpga = FPGAOPEN(szSel);
 
 	if (argc < 2) {

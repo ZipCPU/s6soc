@@ -200,7 +200,7 @@ int main(int argc, char **argv) {
 	} argc -= skp;
 
 	char    szSel[64];
-	strcpy(szSel, "SN:210282768825");
+	strcpy(szSel, S6SN);
 	m_fpga = new FPGA(new DEPPI(szSel));
 
 	BUSSCOPE	*scope = new BUSSCOPE(m_fpga, R_SCOPE, false);

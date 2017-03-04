@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 	FPGA::BUSW	*buf = new FPGA::BUSW[BUFLN];
 
 	char	szSel[64];
-	strcpy(szSel, "SN:210282768825");
+	strcpy(szSel, S6SN);
 	m_fpga = FPGAOPEN(szSel);
 
 	fprintf(stderr, "Before starting, nread = %ld\n", 
