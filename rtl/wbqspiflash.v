@@ -1,8 +1,8 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	wbspiflash.v
 //
-// Project:	Wishbone Controlled Quad SPI Flash Controller
+// Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
 // Purpose:	Access a Quad SPI flash via a WISHBONE interface.  This
 //		includes both read and write (and erase) commands to the SPI
@@ -24,12 +24,12 @@
 //	(19 bits): Data (R/w, but expect writes to take a while)
 //		
 //
-// Creator:	Dan Gisselquist
+// Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -42,7 +42,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -50,7 +50,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 `include "flashconfig.v"
 //
@@ -65,10 +65,10 @@
 `define	WBQSPI_READ_CMD		8
 `define	WBQSPI_READ_DATA	9
 `define	WBQSPI_WAIT_TIL_RDIDLE	10
-`define	WBQSPI_READ_ID_CMD	11	//
-`define	WBQSPI_READ_ID		12	//
-`define	WBQSPI_READ_STATUS	13	//
-`define	WBQSPI_READ_CONFIG	14	//
+`define	WBQSPI_READ_ID_CMD	11
+`define	WBQSPI_READ_ID		12
+`define	WBQSPI_READ_STATUS	13
+`define	WBQSPI_READ_CONFIG	14
 `define	WBQSPI_WAIT_TIL_IDLE	15
 //
 //
@@ -238,7 +238,7 @@ module	wbqspiflash(i_clk_100mhz,
 		spi_spd  <= 1'b0;
 		spi_dir <= 1'b0; // Write (for now, 'cause of cmd)
 		// Data register access
-		if ((i_wb_data_stb)&&(i_wb_cyc))
+		if (i_wb_data_stb)
 		begin
 
 			if (i_wb_we) // Request to write a page
@@ -300,7 +300,7 @@ module	wbqspiflash(i_clk_100mhz,
 				o_wb_stall <= 1'b1;
 `endif
 			end
-		end else if ((i_wb_cyc)&&(i_wb_ctrl_stb)&&(i_wb_we))
+		end else if ((i_wb_ctrl_stb)&&(i_wb_we))
 		begin
 `ifdef	READ_ONLY
 			o_wb_ack   <= 1'b1;
@@ -366,7 +366,7 @@ module	wbqspiflash(i_clk_100mhz,
 				end
 			endcase
 `endif
-		end else if ((i_wb_cyc)&&(i_wb_ctrl_stb)) // &&(~i_wb_we))
+		end else if (i_wb_ctrl_stb) // &&(~i_wb_we))
 		begin
 			case(i_wb_addr[1:0])
 			2'b00: begin // Read local register
@@ -442,7 +442,7 @@ module	wbqspiflash(i_clk_100mhz,
 		spi_hold <= 1'b0;
 		spi_spd<= 1'b1;
 		spi_dir <= 1'b0; // Write (for now)
-		if ((i_wb_cyc)&&(i_wb_data_stb)&&(~i_wb_we))
+		if ((i_wb_data_stb)&&(~i_wb_we))
 		begin // Continue our read ... send the new address / mode
 			o_wb_stall <= 1'b1;
 			spi_wr <= 1'b1;
@@ -450,7 +450,7 @@ module	wbqspiflash(i_clk_100mhz,
 			spi_in <= { {(24-ADDRESS_WIDTH){1'b0}},
 					i_wb_addr[(ADDRESS_WIDTH-3):0], 2'b00, 8'ha0 };
 			state <= `WBQSPI_QRD_DUMMY;
-		end else if((i_wb_cyc)&&(i_wb_ctrl_stb)&&(~i_wb_we)&&(i_wb_addr[1:0] == 2'b00))
+		end else if((i_wb_ctrl_stb)&&(~i_wb_we)&&(i_wb_addr[1:0] == 2'b00))
 		begin
 			// A local read that doesn't touch the device, so leave
 			// the device in its current state
@@ -462,7 +462,7 @@ module	wbqspiflash(i_clk_100mhz,
 					quad_mode_enabled,
 					{(29-ADDRESS_WIDTH){1'b0}},
 					erased_sector, 14'h000 };
-		end else if((i_wb_cyc)&&((i_wb_ctrl_stb)||(i_wb_data_stb)))
+		end else if(((i_wb_ctrl_stb)||(i_wb_data_stb)))
 		begin // Need to release the device from quad mode for all else
 			o_wb_ack   <= 1'b0;
 			o_wb_stall <= 1'b1;
@@ -702,7 +702,7 @@ module	wbqspiflash(i_clk_100mhz,
 	end else if (state == `WBQSPI_READ_DATA)
 	begin
 		// Pipelined read support
-		spi_wr <=((i_wb_cyc)&&(i_wb_data_stb)&&(~i_wb_we)&&(i_wb_addr== (spif_addr+1)));
+		spi_wr <=((i_wb_data_stb)&&(~i_wb_we)&&(i_wb_addr== (spif_addr+1)));
 		spi_in <= 32'h00;
 		spi_len <= 2'b11;
 		// Don't adjust the speed here, it was set in the setup
@@ -726,8 +726,7 @@ module	wbqspiflash(i_clk_100mhz,
 			o_wb_ack <= spif_req;
 			o_wb_stall <= (~spi_wr);
 			// adjust endian-ness to match the PC
-			o_wb_data <= { spi_out[7:0], spi_out[15:8],
-				spi_out[23:16], spi_out[31:24] };
+			o_wb_data <= spi_out; 
 			state <= (spi_wr)?`WBQSPI_READ_DATA
 				: ((spi_spd) ? `WBQSPI_WAIT_TIL_RDIDLE : `WBQSPI_WAIT_TIL_IDLE);
 			spif_req <= spi_wr;
@@ -1013,11 +1012,7 @@ module	wbqspiflash(i_clk_100mhz,
 		o_wb_stall <= 1'b1;
 		o_wb_ack   <= 1'b0;
 		spi_wr   <= 1'b1; // write without waiting
-		spi_in   <= {
-			spif_data[ 7: 0],
-			spif_data[15: 8],
-			spif_data[23:16],
-			spif_data[31:24] };
+		spi_in   <= spif_data;
 		spi_len  <= 2'b11; // Write 4 bytes
 		spi_hold <= 1'b1;
 		if (~spi_busy)
