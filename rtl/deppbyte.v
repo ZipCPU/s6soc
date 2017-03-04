@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -27,7 +27,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -77,9 +77,9 @@ module deppbyte(i_clk,
 
 	reg	[7:0]	addr;
 	wire	astb, dstb, w_write;
-	assign	astb = (~r_astb_n)&&(l_astb_n);
-	assign	dstb = (~r_dstb_n)&&(l_dstb_n);
-	assign	w_write= (~r_write_n);
+	assign	astb = (!r_astb_n)&&(l_astb_n);
+	assign	dstb = (!r_dstb_n)&&(l_dstb_n);
+	assign	w_write= (!r_write_n);
 
 
 	initial	addr = 8'h00;
@@ -102,7 +102,7 @@ module deppbyte(i_clk,
 	// (less than one clock) of when the strobe lines are brought low, and
 	// raised high again within 10 ms of when the strobe lines are raised
 	// again.
-	assign	o_wait = ((~i_dstb_n)||(~i_astb_n));
+	assign	o_wait = ((!i_dstb_n)||(!i_astb_n));
 
 	// For one clock, following any read from address zero, we allow the
 	// port to write one new byte into our interface.  This works because

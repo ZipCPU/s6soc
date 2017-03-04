@@ -132,7 +132,7 @@ module	wbicape6(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 			state <= `ICAP_IDLE;
 			r_data <= i_wb_data[15:0];
 			r_we   <= i_wb_we;
-			if ((i_wb_cyc)&&(i_wb_stb))
+			if (i_wb_stb)
 			begin
 				state <= `ICAP_START;
 				icap_stb    <= i_wb_stb;

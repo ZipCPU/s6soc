@@ -109,7 +109,7 @@ module	wbpwmaudio(i_clk,
 		reg	[(TIMING_BITS-1):0]	r_reload_value;
 		initial	r_reload_value = DEFAULT_RELOAD;
 		always @(posedge i_clk) // Data write
-			if ((i_wb_cyc)&&(i_wb_stb)&&(i_wb_addr)&&(i_wb_we))
+			if ((i_wb_stb)&&(i_wb_addr)&&(i_wb_we))
 				r_reload_value <= i_wb_data[(TIMING_BITS-1):0];
 		assign	w_reload_value = r_reload_value;
 	end else begin
@@ -139,7 +139,7 @@ module	wbpwmaudio(i_clk,
 	initial	next_valid = 1'b1;
 	initial	next_sample = 16'h8000;
 	always @(posedge i_clk) // Data write
-		if ((i_wb_cyc)&&(i_wb_stb)&&(i_wb_we)
+		if ((i_wb_stb)&&(i_wb_we)
 				&&((~i_wb_addr)||(VARIABLE_RATE==0)))
 		begin
 			// Write with two's complement data, convert it
@@ -188,7 +188,7 @@ module	wbpwmaudio(i_clk,
 
 	initial	o_wb_ack = 1'b0;
 	always @(posedge i_clk)
-		o_wb_ack <= (i_wb_cyc)&&(i_wb_stb);
+		o_wb_ack <= (i_wb_stb);
 	assign	o_wb_stall = 1'b0;
 
 endmodule

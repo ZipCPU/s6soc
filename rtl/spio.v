@@ -57,7 +57,7 @@ module	spio(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_data, o_wb_data,
 	initial	o_kp_col = 4'h0;
 	initial	o_led    = 4'h0;
 	always @(posedge i_clk)
-		if ((i_wb_cyc)&&(i_wb_stb)&&(i_wb_we))
+		if ((i_wb_stb)&&(i_wb_we))
 		begin
 			o_kp_col <= ((o_kp_col)&(~i_wb_data[11:8]))
 					|((i_wb_data[15:12])&(i_wb_data[11:8]));

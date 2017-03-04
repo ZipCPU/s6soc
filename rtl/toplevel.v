@@ -53,7 +53,7 @@
 module toplevel(i_clk_8mhz,
 		o_qspi_cs_n, o_qspi_sck, io_qspi_dat,
 		i_btn, o_led, o_pwm, o_pwm_shutdown_n, o_pwm_gain,
-			i_uart, o_uart, o_uart_cts, i_uart_rts,
+			i_uart, o_uart, o_uart_rts_n, i_uart_cts_n,
 		i_kp_row, o_kp_col,
 		i_gpio, o_gpio,
 		io_scl, io_sda);
@@ -73,8 +73,8 @@ module toplevel(i_clk_8mhz,
 	input		i_uart;
 	output	wire	o_uart;
 	//	and it's associated control wires
-	output	wire	o_uart_cts;
-	input		i_uart_rts;
+	output	wire	o_uart_rts_n;
+	input		i_uart_cts_n;
 	// Our keypad
 	input		[3:0]	i_kp_row;
 	output	wire	[3:0]	o_kp_col;
@@ -127,16 +127,25 @@ module toplevel(i_clk_8mhz,
 	wire		tx_busy;
 	wire	[29:0]	uart_setup;
 
+	// Baud rate is set by clock rate / baud rate desired.  Thus,
+	// 80 MHz / 9600 Baud = 8333, or about 0x208d.  We choose a slow
+	// speed such as 9600 Baud to help the CPU keep up with the serial
+	// port rate.
+	localparam [30:0]	UART_SETUP = 31'h4000208d;
+	assign	uart_setup = UART_SETUP;
+
 	wire		reset_s;
 	assign	reset_s = 1'b0;
 
 	wire	rx_break, rx_parity_err, rx_frame_err, rx_ck_uart, tx_break;
 	assign	tx_break = 1'b0;
-	rxuart	rcvuart(clk_s, 1'b0, uart_setup,
+	rxuart	#(UART_SETUP)
+		rcvuart(clk_s, 1'b0, uart_setup,
 			i_uart, rx_stb, rx_data,
 			rx_break, rx_parity_err, rx_frame_err, rx_ck_uart);
-	txuart	tcvuart(clk_s, reset_s, uart_setup, tx_break, tx_stb, tx_data,
-			o_uart, tx_busy);
+	txuart	#(UART_SETUP)
+		tcvuart(clk_s, reset_s, uart_setup, tx_break, tx_stb, tx_data,
+			i_uart_cts_n, o_uart, tx_busy);
 
 
 	//
@@ -152,21 +161,20 @@ module toplevel(i_clk_8mhz,
 	wire	[1:0]	qspi_bmod;
 	wire	[15:0]	w_gpio;
 
+	wire	w_uart_rts_n;
 	busmaster	masterbus(clk_s, 1'b0,
 		// External ... bus control (if enabled)
-		rx_stb, rx_data, tx_stb, tx_data, tx_busy, w_uart_cts,
+		rx_stb, rx_data, tx_stb, tx_data, tx_busy, w_uart_rts_n,
 		// SPI/SD-card flash
 		o_qspi_cs_n, o_qspi_sck, qspi_dat, io_qspi_dat, qspi_bmod,
 		// Board lights and switches
 		i_btn, o_led, o_pwm, { o_pwm_shutdown_n, o_pwm_gain },
 		// Keypad connections
 		i_kp_row, o_kp_col,
-		// UART control
-		uart_setup,
 		// GPIO lines
 		{ i_gpio, io_scl, io_sda }, w_gpio
 		);
-	assign	o_uart_cts = (w_uart_cts)&&(i_uart_rts);
+	assign	o_uart_rts_n = (w_uart_rts_n);
 
 	//
 	// Quad SPI support
@@ -186,7 +194,7 @@ module toplevel(i_clk_8mhz,
 	//	Supporting I2C requires a couple quick adjustments to our
 	//	GPIO lines.  Specifically, we'll allow that when the output
 	//	(i.e. w_gpio) pins are high, then the I2C lines float.  They
-	//	will be (need to be) pulled up by a resistor in order to 
+	//	will be (need to be) pulled up by a resistor in order to
 	//	match the I2C protocol, but this change makes them look/act
 	//	more like GPIO pins.
 	//

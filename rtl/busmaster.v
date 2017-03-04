@@ -35,47 +35,55 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+// 2646 Slice LUTs after translate becomes 2324 once built.
+// After i_rst simplification,			2617 LUTs ->2308
+// After adding OPT_CIS, 			2719 LUTs ->23??
+// After dropping scope holdoff to 9 bits,	2698 LUTs ->23??
+// After dropping scope size from 10 to 6 bits,	2685 LUTs -> 
+// After simplifying scope some more,		2684 LUTs -> (WONT FIT)
+// Removed scope--wouldn't fit
+// Removed OPT_CIS ... should be back to what it was before, 2582 LUTs -> ??
+//
+// Starting again with current state, 2579 LUTS -> 2103
+//	Becomes 2681 -> 2187
 //
 `include "builddate.v"
 //
-`define	INCLUDE_ZIPPY
 `define	IMPLEMENT_ONCHIP_RAM
-// `ifndef	VERILATOR
-// `define	FANCY_ICAP_ACCESS
-// `endif
 `define	FLASH_ACCESS
-`define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
+// `define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
 // `define	COMPRESSED_SCOPE
-`define	INCLUDE_SECOND_TIMER
-`define	SECOND_TIMER_IS_WATCHDOG
-// `define	INCLUDE_RTC	// About 90 LUTs
-// `define	FULL_BUSERR_CALCULATION
 `define	INCLUDE_CPU_RESET_LOGIC
 module	busmaster(i_clk, i_rst,
 		i_rx_stb, i_rx_data, o_tx_stb, o_tx_data, i_tx_busy,
-			o_uart_cts,
+			o_uart_rts_n,
 		// The SPI Flash lines
 		o_qspi_cs_n, o_qspi_sck, o_qspi_dat, i_qspi_dat, o_qspi_mod,
 		// The board I/O
 		i_btn, o_led, o_pwm, o_pwm_aux,
 		// Keypad connections
 		i_kp_row, o_kp_col,
-		// UART control
-		o_uart_setup,
 		// GPIO lines
 		i_gpio, o_gpio);
 	parameter	BUS_ADDRESS_WIDTH=23,
 			ZIP_ADDRESS_WIDTH=BUS_ADDRESS_WIDTH,
-			CMOD_ZIPCPU_RESET_ADDRESS=23'h480000;
+			CMOD_ZIPCPU_RESET_ADDRESS=32'h1200000;
 	localparam	ZA=ZIP_ADDRESS_WIDTH,
 			BAW=BUS_ADDRESS_WIDTH; // 24bits->2,258,23b->2181
+	// 2^14 bytes requires a LGMEMSZ of 14, and 12 address bits ranging from
+	// 0 to 11.  As with many other devices, the wb_cyc line is more for
+	// form than anything else--it is ignored by the memory itself.
+	localparam	LGMEMSZ=14;	// Takes 8 BLKRAM16 elements for 14
+	// As with the memory size, the flash size is also measured in log_2 of
+	// the number of bytes.
+	localparam	LGFLASHSZ = 24;
 	input			i_clk, i_rst;
 	input			i_rx_stb;
 	input		[7:0]	i_rx_data;
 	output	reg		o_tx_stb;
 	output	reg	[7:0]	o_tx_data;
 	input			i_tx_busy;
-	output	wire		o_uart_cts;
+	output	wire		o_uart_rts_n;
 	// SPI flash control
 	output	wire		o_qspi_cs_n, o_qspi_sck;
 	output	wire	[3:0]	o_qspi_dat;
@@ -89,8 +97,6 @@ module	busmaster(i_clk, i_rst,
 	// Keypad
 	input		[3:0]	i_kp_row;
 	output	wire	[3:0]	o_kp_col;
-	// UART control
-	output	wire	[29:0]	o_uart_setup;
 	// GPIO liines
 	input		[15:0]	i_gpio;
 	output	wire	[15:0]	o_gpio;
@@ -105,14 +111,12 @@ module	busmaster(i_clk, i_rst,
 	wire	[31:0]	wb_data, wb_idata;
 	wire	[3:0]	wb_sel;
 	wire	[(BAW-1):0]	wb_addr;
-	wire	[5:0]		io_addr;
+	wire	[3:0]		io_addr;
 	assign	io_addr = {
-			wb_addr[22],	// Flash
-			wb_addr[13],	// RAM
-			wb_addr[11],	// RTC
-			wb_addr[10],	// CFG
-			wb_addr[ 9],	// SCOPE
-			wb_addr[ 8] };	// I/O
+			wb_addr[(LGFLASHSZ-2)],	// Flash
+			wb_addr[(LGMEMSZ-2)],	// RAM
+			wb_addr[ 9],		// SCOPE
+			wb_addr[ 8] };		// I/O
 
 	// Wires going to devices
 	// And then headed back home
@@ -137,7 +141,7 @@ module	busmaster(i_clk, i_rst,
 	wire	[(BAW-1):0]	dwb_addr;
 	wire	[31:0]		dwb_odata;
 
-	// wire	[31:0]	zip_debug;
+	wire	cpu_reset, watchdog_int;
 //
 // We'll define our RESET_ADDRESS to be halfway through our flash memory.
 //	`define	CMOD_ZIPCPU_RESET_ADDRESS	23'h600000
@@ -152,7 +156,6 @@ module	busmaster(i_clk, i_rst,
 // in the flash without needing to change our FPGA load and vice versa.
 //
 // 23'h404000
-	wire	cpu_reset, tmrb_int;
 `ifdef	INCLUDE_CPU_RESET_LOGIC
 	reg	btn_reset, x_button, r_button;
 	initial	btn_reset = 1'b0;
@@ -162,11 +165,7 @@ module	busmaster(i_clk, i_rst,
 	begin
 		x_button <= i_btn[1];
 		r_button <= x_button;
-`ifdef	SECOND_TIMER_IS_WATCHDOG
-		btn_reset <= ((r_button)&&(zip_cpu_int))||(tmrb_int);
-`else
-		btn_reset <= ((r_button)&&(zip_cpu_int));
-`endif
+		btn_reset <= ((r_button)&&(zip_cpu_int))||(watchdog_int);
 	end
 	assign	cpu_reset = btn_reset;
 `else
@@ -174,7 +173,7 @@ module	busmaster(i_clk, i_rst,
 `endif
 
 	zipbones #(CMOD_ZIPCPU_RESET_ADDRESS,ZA,6)
-		thecpu(i_clk, btn_reset, // 1'b0,
+		swic(i_clk, btn_reset, // 1'b0,
 			// Zippys wishbone interface
 			wb_cyc, wb_stb, wb_we, w_zip_addr, wb_data, wb_sel,
 				wb_ack, wb_stall, wb_idata, wb_err,
@@ -190,13 +189,9 @@ module	busmaster(i_clk, i_rst,
 		assign	wb_addr = w_zip_addr;
 	endgenerate
 
-	wire	io_sel, flash_sel, flctl_sel, scop_sel, cfg_sel, mem_sel,
-			rtc_sel, none_sel, many_sel;
+	wire	io_sel, flash_sel, flctl_sel, scop_sel, mem_sel,
+			none_sel, many_sel;
 	wire	flash_ack, scop_ack, cfg_ack, mem_ack, many_ack;
-	wire	rtc_ack, rtc_stall;
-`ifdef	INCLUDE_RTC
-	assign	rtc_stall = 1'b0;
-`endif
 	wire	io_stall, flash_stall, scop_stall, cfg_stall, mem_stall;
 	reg	io_ack;
 
@@ -205,91 +200,34 @@ module	busmaster(i_clk, i_rst,
 	reg	[31:0]	io_data;
 	reg	[(BAW-1):0]	bus_err_addr;
 
-	assign	wb_ack = (wb_cyc)&&((io_ack)||(scop_ack)||(cfg_ack)
-`ifdef	INCLUDE_RTC
-				||(rtc_ack)
-`endif
+	assign	wb_ack = (wb_cyc)&&((io_ack)||(scop_ack)
 				||(mem_ack)||(flash_ack)||((none_sel)&&(1'b1)));
 	assign	wb_stall = ((io_sel)&&(io_stall))
 			||((scop_sel)&&(scop_stall))
-			||((cfg_sel)&&(cfg_stall))
 			||((mem_sel)&&(mem_stall))
-`ifdef	INCLUDE_RTC
-			||((rtc_sel)&&(rtc_stall))
-`endif
 			||((flash_sel||flctl_sel)&&(flash_stall));
 			// (none_sel)&&(1'b0)
 
-	/*
-	assign	wb_idata = (io_ack)?io_data
-			: ((scop_ack)?scop_data
-			: ((cfg_ack)?cfg_data
-			: ((mem_ack)?mem_data
-			: ((flash_ack)?flash_data
-			: 32'h00))));
-	*/
 	assign	wb_idata =  (io_ack|scop_ack)?((io_ack )? io_data  : scop_data)
-			: ((mem_ack|rtc_ack)?((mem_ack)?mem_data:rtc_data)
-			: ((cfg_ack) ? cfg_data : flash_data));//if (flash_ack)
-	assign	wb_err = ((wb_cyc)&&(wb_stb)&&(none_sel || many_sel)) || many_ack;
+			: ((mem_ack)?(mem_data)
+			: flash_data);
+	assign	wb_err = ((wb_stb)&&(none_sel || many_sel)) || many_ack;
 
 	// Addresses ...
 	//	0000 xxxx	configuration/control registers
 	//	1 xxxx xxxx xxxx xxxx xxxx	Up-sampler taps
-	assign	io_sel   =((wb_cyc)&&(io_addr[5:0]==6'h1));
-	assign	scop_sel =((wb_cyc)&&(io_addr[5:1]==5'h1));
+	assign	io_sel   =((wb_cyc)&&(io_addr[3:0]==4'h1));
+	assign	scop_sel =((wb_cyc)&&(io_addr[3:1]==3'h1));
 	assign	flctl_sel= 1'b0; // ((wb_cyc)&&(io_addr[5:1]==5'h1));
-	assign	cfg_sel  =((wb_cyc)&&(io_addr[5:2]==4'h1));
-	// zip_sel is not on the bus at this point
-`ifdef	INCLUDE_RTC
-	assign	rtc_sel  =((wb_cyc)&&(io_addr[5:3]==3'h1));
-`endif
-	assign	mem_sel  =((wb_cyc)&&(io_addr[5:4]==2'h1));
-	assign	flash_sel=((wb_cyc)&&(io_addr[5]));
+	assign	mem_sel  =((wb_cyc)&&(io_addr[3:2]==2'h1));
+	assign	flash_sel=((wb_cyc)&&(io_addr[3]));
 
-`ifdef	FULL_BUSERR_CALCULATION
-	assign	none_sel =((wb_cyc)&&(wb_stb)&&
-			((io_addr==6'h0)
-			||((~io_addr[5])&&(|wb_addr[22:14]))
-			||((io_addr[5:4]==2'b00)&&(|wb_addr[12])))
-			);
-	assign	many_sel =((wb_cyc)&&(wb_stb)&&(
-			 {3'h0, io_sel}
-			+{3'h0, flctl_sel}
-			+{3'h0, scop_sel}
-			+{3'h0, cfg_sel}
-			+{3'h0, rtc_sel}
-			+{3'h0, mem_sel}
-			+{3'h0, flash_sel} > 1));
-
-	assign	many_ack =((wb_cyc)&&(
-			 {3'h0, io_ack}
-			+{3'h0, scop_ack}
-			+{3'h0, cfg_ack}
-`ifdef	INCLUDE_RTC
-			+{3'h0, rtc_ack}
-`endif
-			+{3'h0, mem_ack}
-			+{3'h0, flash_ack} > 1));
-`else
 	assign	many_ack = 1'b0;
 	assign	many_sel = 1'b0;
-	assign	none_sel =((wb_cyc)&&(wb_stb)&&(
-				(io_addr[5:4]==2'h0)
-				&&(~io_addr[0])
-`ifdef	INCLUDE_RTC
-				&&(~io_addr[3])
-`endif
-`ifdef	FANCY_ICAP_ACCESS
-				&&(~io_addr[2])
-`endif
-`ifdef	DBG_SCOPE
-				&&(~io_addr[1])
-`endif
-				));
-`endif
-	wire		flash_interrupt, scop_interrupt, tmra_int,
-			rtc_interrupt, gpio_int, pwm_int, keypad_int,button_int;
+	assign	none_sel =((wb_stb)&&(io_addr==4'h0));
+
+	wire		flash_interrupt, scop_interrupt, timer_int,
+			gpio_int, pwm_int, keypad_int,button_int;
 
 
 	//
@@ -300,13 +238,8 @@ module	busmaster(i_clk, i_rst,
 	assign	int_vector = { 
 					gpio_int, pwm_int, keypad_int,
 				(~o_tx_stb), rx_rdy,
-`ifdef	SECOND_TIMER_IS_WATCHDOG
-				1'b0,
-`else
-				tmrb_int,
-`endif
-				tmra_int,
-				rtc_interrupt, scop_interrupt,
+				1'b0, timer_int,
+				1'b0, scop_interrupt,
 				wb_err, button_int };
 
 	wire	[31:0]	pic_data;
@@ -319,66 +252,25 @@ module	busmaster(i_clk, i_rst,
 		if (wb_err)
 			bus_err_addr <= wb_addr;
 
-	wire	[31:0]	timer_a, timer_b;
+	wire	[31:0]	timer_data, watchdog_data;
 	wire		zta_ack, zta_stall, ztb_ack, ztb_stall;
 	ziptimer	#(32,31,1)
-		zipt_a(i_clk, 1'b0, 1'b1, wb_cyc,
-`ifdef	INCLUDE_SECOND_TIMER
+		thetimer(i_clk, 1'b0, 1'b1, wb_cyc,
 				(wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h2),
-`else
-				(wb_stb)&&(io_sel)&&(wb_addr[3:1]==3'h1),
-`endif
-				wb_we, wb_data, zta_ack, zta_stall, timer_a,
-				tmra_int);
-`ifdef	INCLUDE_SECOND_TIMER
-`ifdef	SECOND_TIMER_IS_WATCHDOG
+				wb_we, wb_data, zta_ack, zta_stall, timer_data,
+				timer_int);
 	ziptimer	#(32,31,0)
-		zipt_b(i_clk, cpu_reset, 1'b1, wb_cyc,
+		watchdog(i_clk, cpu_reset, 1'b1, wb_cyc,
 				(wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h3),
-				wb_we, wb_data, ztb_ack, ztb_stall, timer_b,
-				tmrb_int);
-`else
-	ziptimer	#(32,31,1)
-		zipt_b(i_clk, cpu_reset, 1'b1, wb_cyc,
-				(wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h3),
-				wb_we, wb_data, ztb_ack, ztb_stall, timer_b,
-				tmrb_int);
-`endif
-`else
-	// assign	timer_b = 32'h000;
-	assign	timer_b = timer_a;
-	assign	tmrb_int = 1'b0;
-`endif
-
-	wire	[31:0]	rtc_data;
-`ifdef	INCLUDE_RTC
-	wire	rtcd_ack, rtcd_stall, ppd;
-	// rtcdate	thedate(i_clk, ppd, wb_cyc, (wb_stb)&&(io_sel), wb_we,
-			// wb_data, rtcd_ack, rtcd_stall, date_data);
-	reg	r_rtc_ack;
-	initial	r_rtc_ack = 1'b0;
-	always @(posedge i_clk)
-		r_rtc_ack <= ((wb_stb)&&(rtc_sel));
-	assign	rtc_ack = r_rtc_ack;
-
-	rtclight
-		#(23'h35afe5,23,0,0) 	// 80 MHz clock
-		thetime(i_clk, wb_cyc,
-			((wb_stb)&&(rtc_sel)), wb_we,
-			{ 1'b0, wb_addr[1:0] }, wb_data, rtc_data,
-			rtc_interrupt, ppd);
-`else
-	assign	rtc_interrupt = 1'b0;
-	assign	rtc_data = 32'h00;
-	assign	rtc_ack  = 1'b0;
-`endif
+				wb_we, wb_data, ztb_ack, ztb_stall, watchdog_data,
+				watchdog_int);
 
 	always @(posedge i_clk)
 		case(wb_addr[3:0])
 			4'h0: io_data <= pic_data;
 			4'h1: io_data <= { {(32-BAW){1'b0}}, bus_err_addr };
-			4'h2: io_data <= timer_a;
-			4'h3: io_data <= timer_b;
+			4'h2: io_data <= timer_data;
+			4'h3: io_data <= watchdog_data;
 			4'h4: io_data <= pwm_data;
 			4'h5: io_data <= spio_data;
 			4'h6: io_data <= gpio_data;
@@ -387,7 +279,7 @@ module	busmaster(i_clk, i_rst,
 			// 4'h8: io_data <= `DATESTAMP;
 		endcase
 	always @(posedge i_clk)
-		io_ack <= (wb_cyc)&&(wb_stb)&&(io_sel);
+		io_ack <= (wb_stb)&&(io_sel);
 	assign	io_stall = 1'b0;
 
 	wire	pwm_ack, pwm_stall;
@@ -422,14 +314,6 @@ module	busmaster(i_clk, i_rst,
 	//
 	reg	[7:0]	r_rx_data;
 	// Baud rate is set by clock rate / baud rate.
-	// Thus, 80MHz / 115200MBau
-	//	= 694.4, or about 0x2b6. 
-	// although the CPU might struggle to keep up at this speed without a
-	// hardware buffer.
-	//
-	// We'll add the flag for two stop bits.
-	// assign	o_uart_setup = 30'h080002b6; // 115200 MBaud @ an 80MHz clock
-	assign	o_uart_setup = 30'h0000208d; // 9600 MBaud, 8N1
 
 	initial	o_tx_stb = 1'b0;
 	initial	o_tx_data = 8'h00;
@@ -452,7 +336,7 @@ module	busmaster(i_clk, i_rst,
 		else if (i_rx_stb)
 			rx_rdy <= (rx_rdy | i_rx_stb);
 	end
-	assign	o_uart_cts = (~rx_rdy);
+	assign	o_uart_rts_n = (rx_rdy);
 	assign	uart_data = { 23'h0, ~rx_rdy, r_rx_data };
 	//
 	// uart_ack gets returned as part of io_ack, since that happens when
@@ -467,12 +351,14 @@ module	busmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
-	wbqspiflash #(24)	flashmem(i_clk,
-		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
-			wb_addr[(24-3):0], wb_data,
-		flash_ack, flash_stall, flash_data,
-		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat,
-		flash_interrupt);
+	wbqspiflash #(LGFLASHSZ)
+		flashmem(i_clk,
+			wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),
+			wb_we, wb_addr[(LGFLASHSZ-3):0], wb_data,
+			flash_ack, flash_stall, flash_data,
+			o_qspi_sck, o_qspi_cs_n, o_qspi_mod,
+				o_qspi_dat, i_qspi_dat,
+			flash_interrupt);
 `else
 	assign o_qspi_sck  = 1'b0;
 	assign o_qspi_cs_n = 1'b0;
@@ -481,38 +367,19 @@ module	busmaster(i_clk, i_rst,
 `endif
 
 	//
-	//	MULTIBOOT/ICAPE2 CONFIGURATION ACCESS
-	//
-	wire	[31:0]	cfg_scope;
-`ifdef	FANCY_ICAP_ACCESS
-	wbicape6	fpga_cfg(i_clk, wb_cyc,(cfg_sel)&&(wb_stb), wb_we,
-				wb_addr[5:0], wb_data,
-				cfg_ack, cfg_stall, cfg_data,
-				cfg_scope);
-`else
-	reg	r_cfg_ack;
-	always @(posedge i_clk)
-		r_cfg_ack <= (wb_cyc)&&(cfg_sel)&&(wb_stb);
-	assign	cfg_ack   = r_cfg_ack;
-	assign	cfg_stall = 1'b0;
-	assign	cfg_data  = 32'h00;
-	assign	cfg_scope = 32'h00;
-`endif
-
-
-	//
 	//	ON-CHIP RAM MEMORY ACCESS
 	//
 `ifdef	IMPLEMENT_ONCHIP_RAM
-	memdev	#(12) ram(i_clk, wb_cyc, (wb_stb)&&(mem_sel), wb_we,
-			wb_addr[11:0], wb_data, wb_sel,
+	memdev	#(.LGMEMSZ(LGMEMSZ))
+		ram(i_clk, wb_cyc, (wb_stb)&&(mem_sel), wb_we,
+			wb_addr[(LGMEMSZ-3):0], wb_data, wb_sel,
 			mem_ack, mem_stall, mem_data);
 `else
 	assign	mem_data = 32'h00;
 	assign	mem_stall = 1'b0;
 	reg	r_mem_ack;
 	always @(posedge i_clk)
-		r_mem_ack <= (wb_cyc)&&(wb_stb)&&(mem_sel);
+		r_mem_ack <= (wb_stb)&&(mem_sel);
 	assign	mem_ack = r_mem_ack;
 `endif
 
@@ -523,19 +390,16 @@ module	busmaster(i_clk, i_rst,
 	//
 	//
 	//
-	wire	[31:0]	scop_cfg_data;
-	wire		scop_cfg_ack, scop_cfg_stall, scop_cfg_interrupt;
+	wire	[31:0]	scop_cpu_data;
+	wire		scop_cpu_ack, scop_cpu_stall, scop_cpu_interrupt;
 `ifdef	DBG_SCOPE
-	wire		scop_cfg_trigger;
-	assign	scop_cfg_trigger = (wb_cyc)&&(wb_stb)&&(cfg_sel);
-	// wire	scop_trigger = scop_cfg_trigger;
 	wire	scop_trigger = (zip_cpu_int) || (cpu_reset);
 `ifdef	COMPRESSED_SCOPE
 	wbscopc	#(5'ha)
 `else
-	wbscope	#(5'ha)
+	wbscope	#(.LGMEM(5'h6), .HOLDOFFBITS(9))
 `endif
-	wbcfgscope(i_clk, 1'b1, scop_trigger,
+	cpuscope(i_clk, 1'b1, scop_trigger,
 `ifdef	COMPRESSED_SCOPE
 		// cfg_scope[30:0],
 		zip_scope_data[30:0],
@@ -546,21 +410,21 @@ module	busmaster(i_clk, i_rst,
 		// Wishbone interface
 		i_clk, wb_cyc, (wb_stb)&&(scop_sel),
 				wb_we, wb_addr[0], wb_data,
-			scop_cfg_ack, scop_cfg_stall, scop_cfg_data,
-		scop_cfg_interrupt);
+			scop_cpu_ack, scop_cpu_stall, scop_cpu_data,
+		scop_cpu_interrupt);
 `else
-	reg	r_scop_cfg_ack;
+	reg	r_scop_cpu_ack;
 	always @(posedge i_clk)
-		r_scop_cfg_ack <= (wb_cyc)&&(wb_stb)&&(scop_sel);
-	assign	scop_cfg_ack = r_scop_cfg_ack;
-	assign	scop_cfg_data = 32'h000;
-	assign	scop_cfg_stall= 1'b0;
+		r_scop_cpu_ack <= (wb_stb)&&(scop_sel);
+	assign	scop_cpu_ack = r_scop_cpu_ack;
+	assign	scop_cpu_data = 32'h000;
+	assign	scop_cpu_stall= 1'b0;
 `endif
 
-	assign	scop_interrupt = scop_cfg_interrupt;
-	assign	scop_ack   = scop_cfg_ack;
-	assign	scop_stall = scop_cfg_stall;
-	assign	scop_data  = scop_cfg_data;
+	assign	scop_interrupt = scop_cpu_interrupt;
+	assign	scop_ack   = scop_cpu_ack;
+	assign	scop_stall = scop_cpu_stall;
+	assign	scop_data  = scop_cpu_data;
 
 endmodule
 

@@ -63,7 +63,7 @@ module wbgpio(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_data, o_wb_data,
 
 	// 9LUT's, 16 FF's
 	always @(posedge i_clk)
-		if ((i_wb_cyc)&&(i_wb_stb)&&(i_wb_we))
+		if ((i_wb_stb)&&(i_wb_we))
 			o_gpio <= ((o_gpio)&(~i_wb_data[(NOUT+16-1):16]))
 				|((i_wb_data[(NOUT-1):0])&(i_wb_data[(NOUT+16-1):16]));
 
