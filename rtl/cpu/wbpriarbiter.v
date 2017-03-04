@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	wbpriarbiter.v
 //
@@ -25,7 +25,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015, 2017, Gisselquist Technology, LLC
 //
@@ -39,13 +39,19 @@
 // FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 // for more details.
 //
+// You should have received a copy of the GNU General Public License along
+// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// target there if the PDF file isn't present.)  If not, see
+// <http://www.gnu.org/licenses/> for a copy.
+//
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-module	wbpriarbiter(i_clk, 
+//
+module	wbpriarbiter(i_clk,
 	// Bus A
 	i_a_cyc, i_a_stb, i_a_we, i_a_adr, i_a_dat, i_a_sel, o_a_ack, o_a_stall, o_a_err,
 	// Bus B
@@ -67,7 +73,7 @@ module	wbpriarbiter(i_clk,
 	input		[(DW-1):0]	i_b_dat;
 	input		[(DW/8-1):0]	i_b_sel;
 	output	wire			o_b_ack, o_b_stall, o_b_err;
-	// 
+	//
 	output	wire			o_cyc, o_stb, o_we;
 	output	wire	[(AW-1):0]	o_adr;
 	output	wire	[(DW-1):0]	o_dat;
@@ -92,11 +98,31 @@ module	wbpriarbiter(i_clk,
 
 	// Realistically, if neither master owns the bus, the output is a
 	// don't care.  Thus we trigger off whether or not 'A' owns the bus.
-	// If 'B' owns it all we care is that 'A' does not.  Likewise, if 
+	// If 'B' owns it all we care is that 'A' does not.  Likewise, if
 	// neither owns the bus than the values on the various lines are
 	// irrelevant.
-	assign o_stb = (r_a_owner) ? i_a_stb : i_b_stb;
 	assign o_we  = (r_a_owner) ? i_a_we  : i_b_we;
+`ifdef	ZERO_ON_IDLE
+	//
+	// ZERO_ON_IDLE will use up more logic and may even slow down the master
+	// clock if set.  However, it may also reduce the power used by the
+	// FPGA by preventing things from toggling when the bus isn't in use.
+	// The option is here because it also makes it a lot easier to look
+	// for when things happen on the bus via VERILATOR when timing and
+	// logic counts don't matter.
+	//
+	assign o_stb = (o_cyc)?((r_a_owner) ? i_a_stb : i_b_stb):0;
+	assign o_adr = (o_stb)?((r_a_owner) ? i_a_adr : i_b_adr):0;
+	assign o_dat = (o_stb)?((r_a_owner) ? i_a_dat : i_b_dat):0;
+	assign o_sel = (o_stb)?((r_a_owner) ? i_a_sel : i_b_sel):0;
+	assign o_a_ack   = (o_cyc)&&( r_a_owner) ? i_ack   : 1'b0;
+	assign o_b_ack   = (o_cyc)&&(~r_a_owner) ? i_ack   : 1'b0;
+	assign o_a_stall = (o_cyc)&&( r_a_owner) ? i_stall : 1'b1;
+	assign o_b_stall = (o_cyc)&&(~r_a_owner) ? i_stall : 1'b1;
+	assign o_a_err = (o_cyc)&&( r_a_owner) ? i_err : 1'b0;
+	assign o_b_err = (o_cyc)&&(~r_a_owner) ? i_err : 1'b0;
+`else
+	assign o_stb = (r_a_owner) ? i_a_stb : i_b_stb;
 	assign o_adr = (r_a_owner) ? i_a_adr : i_b_adr;
 	assign o_dat = (r_a_owner) ? i_a_dat : i_b_dat;
 	assign o_sel = (r_a_owner) ? i_a_sel : i_b_sel;
@@ -112,10 +138,11 @@ module	wbpriarbiter(i_clk,
 	assign	o_a_stall = ( r_a_owner) ? i_stall : 1'b1;
 	assign	o_b_stall = (~r_a_owner) ? i_stall : 1'b1;
 
-	// 
-	// 
+	//
+	//
 	assign	o_a_err = ( r_a_owner) ? i_err : 1'b0;
 	assign	o_b_err = (~r_a_owner) ? i_err : 1'b0;
+`endif
 
 endmodule
 
