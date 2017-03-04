@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	zipbones.v
 //
@@ -11,9 +11,9 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015, 2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -25,11 +25,17 @@
 // FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 // for more details.
 //
+// You should have received a copy of the GNU General Public License along
+// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// target there if the PDF file isn't present.)  If not, see
+// <http://www.gnu.org/licenses/> for a copy.
+//
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
 //
 `include "cpudefs.v"
 //
@@ -48,9 +54,9 @@ module	zipbones(i_clk, i_rst,
 		, o_zip_debug
 `endif
 		);
-	parameter	RESET_ADDRESS=30'h0100000, ADDRESS_WIDTH=30,
-			LGICACHE=8, START_HALTED=0,
-			AW=ADDRESS_WIDTH;
+	parameter	RESET_ADDRESS=32'h0100000, ADDRESS_WIDTH=30,
+			LGICACHE=8, START_HALTED=0;
+	localparam	AW=ADDRESS_WIDTH;
 	input	i_clk, i_rst;
 	// Wishbone master
 	output	wire		o_wb_cyc, o_wb_stb, o_wb_we;
@@ -168,7 +174,10 @@ module	zipbones(i_clk, i_rst,
 	wire	[31:0]	cpu_dbg_data;
 	assign cpu_dbg_we = ((i_dbg_cyc)&&(i_dbg_stb)
 					&&(i_dbg_we)&&(i_dbg_addr));
-	zipcpu	#(RESET_ADDRESS,ADDRESS_WIDTH,LGICACHE)
+	zipcpu	#(.RESET_ADDRESS(RESET_ADDRESS),
+			.ADDRESS_WIDTH(ADDRESS_WIDTH),
+			.LGICACHE(LGICACHE),
+			.WITH_LOCAL_BUS(0))
 		thecpu(i_clk, cpu_reset, i_ext_int,
 			cpu_halt, cmd_clear_pf_cache, cmd_addr[4:0], cpu_dbg_we,
 				i_dbg_data, cpu_dbg_stall, cpu_dbg_data,
@@ -177,7 +186,7 @@ module	zipbones(i_clk, i_rst,
 				cpu_lcl_cyc, cpu_lcl_stb,
 				o_wb_we, o_wb_addr, o_wb_data, o_wb_sel,
 				i_wb_ack, i_wb_stall, i_wb_data,
-				(i_wb_err)||((cpu_lcl_cyc)&&(cpu_lcl_stb)),
+				(i_wb_err)||(cpu_lcl_cyc),
 			cpu_op_stall, cpu_pf_stall, cpu_i_count
 `ifdef	DEBUG_SCOPE
 			, o_zip_debug

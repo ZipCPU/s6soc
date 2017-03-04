@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	cpudefs.v
 //
@@ -26,7 +26,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015-2016, Gisselquist Technology, LLC
 //
@@ -40,11 +40,18 @@
 // FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 // for more details.
 //
+// You should have received a copy of the GNU General Public License along
+// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// target there if the PDF file isn't present.)  If not, see
+// <http://www.gnu.org/licenses/> for a copy.
+//
 // License:	GPL, v3, as defined and found on www.gnu.org,
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//
 `ifndef	CPUDEFS_H
 `define	CPUDEFS_H
 //
@@ -114,23 +121,28 @@
 //
 //
 //
-// OPT_NEW_INSTRUCTION_SET controls whether or not the new instruction set
-// is in use.  The new instruction set contains space for floating point
-// operations, signed and unsigned divide instructions, as well as bit reversal
-// and ... at least two other operations yet to be defined.  The decoder alone
-// uses about 70 fewer LUTs, although in practice this works out to 12 fewer
-// when all works out in the wash.  Further, floating point and divide
-// instructions will cause an illegal instruction exception if they are not
-// implemented--so software capability can be built to use these instructions
-// immediately, even if the hardware is not yet ready.
 //
-// This option is likely to go away in the future, obsoleting the previous
-// instruction set, so I recommend setting this option and switching to the
-// new instruction set as soon as possible.
+// The instruction set defines an optional compressed instruction set (CIS)
+// complement.  These were at one time erroneously called Very Long Instruction
+// Words.  They are more appropriately referred to as compressed instructions.
+// The compressed instruction format allows two instructions to be packed into
+// the same instruction word.  Some instructions can be compressed, not all.
+// Compressed instructions take the same time to complete.  Set OPT_CIS to
+// include these double instructions as part of the instruction set.  These
+// instructions are designed to get more code density from the instruction set,
+// and to hopefully take some pain off of the performance of the pre-fetch and
+// instruction cache.
 //
-`define	OPT_NEW_INSTRUCTION_SET
+// These new instructions, however, also necessitate a change in the Zip
+// CPU--the Zip CPU can no longer execute instructions atomically.  It must
+// now execute non-CIS instructions, or CIS instruction pairs, atomically. 
+// This logic has been added into the ZipCPU, but it has not (yet) been
+// tested thoroughly.
 //
+// Oh, and the debugger and the simulator also need to be updated as well
+// to properly handle these.
 //
+// `define OPT_CIS	// Adds about 80 LUTs on a Spartan 6
 //
 //
 //
@@ -229,34 +241,8 @@
 //
 //
 //
-`ifdef	OPT_NEW_INSTRUCTION_SET
 //
 //
-//
-// The new instruction set also defines a set of very long instruction words.
-// Well, calling them "very long" instruction words is probably a misnomer,
-// although we're going to do it.  They're really 2x16-bit instructions---
-// instruction words that pack two instructions into one word.  (2x14 bit
-// really--'cause you need a bit to note the instruction is a 2x instruction,
-// and then 3-bits for the condition codes ...)  Set OPT_VLIW to include these
-// double instructions as part of the new instruction set.  These allow a single
-// instruction to contain two instructions within.   These instructions are
-// designed to get more code density from the instruction set, and to hopefully
-// take some pain off of the performance of the pre-fetch and instruction cache.
-//
-// These new instructions, however, also necessitate a change in the Zip
-// CPU--the Zip CPU can no longer execute instructions atomically.  It must
-// now execute non-VLIW instructions, or VLIW instruction pairs, atomically. 
-// This logic has been added into the ZipCPU, but it has not (yet) been
-// tested thoroughly.
-//
-// Oh, and the assembler, the debugger, and the object file dumper, and the
-// simulator all need to be updated as well ....
-//
-`define OPT_VLIW
-//
-//
-`endif // OPT_NEW_INSTRUCTION_SET
 //
 //
 `endif	// OPT_SINGLE_FETCH
