@@ -46,13 +46,16 @@
 #include "ktraps.h"
 #include "errno.h"
 #include "swint.h"
+#include "txfns.h"
+
+typedef	unsigned	size_t;
 
 extern int	kntasks(void);
 extern void	kinit(TASKP *tasklist);
 extern	void	restore_context(int *), save_context(int *);
 SYSPIPE	*rxpipe, *txpipe, *keypipe, *lcdpipe, *pwmpipe, *cmdpipe;
 KDEVICE	*pipedev, *txdev, *pwmdev;
-void	*heap; //  = _top_of_heap; // Need to wait on startup to set this
+char	*heap; //  = _top_of_heap; // Need to wait on startup to set this
 
 #define	CONTEXT_LENGTH	(80000-1)	// 1ms
 
@@ -61,12 +64,12 @@ int	LAST_TASK;
 __attribute__((cold))
 TASKP	*ksetup(void) {
 	TASKP	*tasklist;
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
+	volatile IOSPACE *const sys = _sys;
 
 	sys->io_spio = 0x0f0;
-	sys->io_timb = 0;	// Turn off the watchdog timer
+	sys->io_watchdog = 0;	// Turn off the watchdog timer
 	LAST_TASK = kntasks();
-	heap = _top_of_heap;
+	heap = (char *)_top_of_heap;
 
 	pipedev = sys_malloc(sizeof(KDEVICE));
 	pipedev->write = (RWFDFUN)kwrite_syspipe;
@@ -75,26 +78,25 @@ TASKP	*ksetup(void) {
 
 	txdev = pwmdev = pipedev;
 
-	rxpipe  = new_syspipe(16);	//rxpipe->m_wrtask=INTERRUPT_WRITE_TASK;
-	txpipe  = new_syspipe(8);	txpipe->m_rdtask = INTERRUPT_READ_TASK;
-	keypipe = new_syspipe(16);
-	lcdpipe = new_syspipe(16);
-	pwmpipe = new_syspipe(128);	pwmpipe->m_rdtask= INTERRUPT_READ_TASK;
-	cmdpipe = new_syspipe(16);
+	rxpipe  = new_syspipe(64);	//rxpipe->m_wrtask=INTERRUPT_WRITE_TASK;
+	txpipe  = new_syspipe(64);	txpipe->m_rdtask = INTERRUPT_READ_TASK;
+	keypipe = new_syspipe(64);
+	lcdpipe = new_syspipe(64);
+	pwmpipe = new_syspipe(512);	pwmpipe->m_rdtask= INTERRUPT_READ_TASK;
+	cmdpipe = new_syspipe(64);
 
 	tasklist = sys_malloc(sizeof(TASKP)*(1+LAST_TASK));
 	kinit(tasklist);
-	tasklist[LAST_TASK] = new_task(2, idle_task);
+	tasklist[LAST_TASK] = new_task(8, idle_task);
 
 	// Turn all interrupts off, acknowledge all at the same time
-	sys->io_pic = 0x7fff7fff;
+	sys->io_pic = INT_CLEARPIC;
 
-	sys->io_tima = CONTEXT_LENGTH | TM_REPEAT;
+	sys->io_timer = CONTEXT_LENGTH | TM_REPEAT;
 
 	{
 		// Reset our wishbone scope for debug later
-		SCOPE	*scope = (SCOPE *)SCOPEADDR;
-		scope->s_control = 2;
+		_scope->s_ctrl = 2;
 	}
 	sys->io_spio = 0x0f1;
 
@@ -102,15 +104,13 @@ TASKP	*ksetup(void) {
 }
 
 void	kwait_on_buttonpress(void) {
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
-
 	// Wait on a button press before starting
-	while((sys->io_spio & 0x0f0)==0)
+	while((_sys->io_spio & 0x0f0)==0)
 		;
-	sys->io_spio = 0x0f3;
+	_sys->io_spio = 0x0f3;
 	for(int i=0; i<40000; i++)
-		sys->io_spio = ((i>>14)&2)|0x020;
-	sys->io_spio = 0x0f7;
+		_sys->io_spio = ((i>>14)&2)|0x020;
+	_sys->io_spio = 0x0f7;
 }
 
 // __attribute__((noreturn))
@@ -119,19 +119,9 @@ void	kuserexit(int a) {
 }
 
 __attribute__((malloc))
-void	*sys_malloc(int sz) {
-	if (0) {
-		SCOPE	*s = (SCOPE *)SCOPEADDR;
-		s->s_control = TRIGGER_SCOPE_NOW | (s->s_control & 0x0ffff);
-	}
-
+void	*sys_malloc(size_t sz) {
 	void	*res = heap;
-	heap += sz;
-	if ((int)heap > ((int)&res)-32) {
-		IOSPACE	*sys = (IOSPACE *)IOADDR;
-		sys->io_spio = 0xf3;
-		asm("break 0");
-	}
+	heap = heap + ((sz+3)&-4);
 	return res;
 }
 

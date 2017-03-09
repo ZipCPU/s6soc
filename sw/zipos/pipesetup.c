@@ -44,6 +44,7 @@
 #include "syspipe.h"
 #include "zipsys.h"
 #include "ktraps.h"
+#include "txfns.h"
 
 #ifndef	NULL
 #define	NULL	(void *)0
@@ -77,43 +78,10 @@ static	void	clear_syspipe(SYSPIPE *p) {
 	p->m_nwritten = 0;
 }
 
-// These routines really belong elsewhere in a uartdump.c file or some such.
-// However, until placed there, they'll stay put here for a bit longer.
-void	txchr(char v) {
-	volatile IOSPACE	*sys = (IOSPACE *)IOADDR;
-	if (v < 10)
-		return;
-	v &= 0x0ff;
-	sys->io_pic = INT_UARTTX;
-	while((sys->io_pic&INT_UARTTX)==0)
-		;
-	sys->io_uart = v;
-}
-
-void	txstr(const char *str) {
-	const char *ptr = str;
-	while(*ptr) {
-		txchr(*ptr++);
-	}
-}
-
-void	txhex(int num) {
-	for(int ds=28; ds>=0; ds-=4) {
-		int	ch;
-		ch = (num>>ds)&0x0f;
-		if (ch >= 10)
-			ch = 'A'+ch-10;
-		else
-			ch += '0';
-		txchr(ch);
-	} txstr("\r\n");
-}
-
 void	pipe_panic(SYSPIPE *pipe) {
 	extern void	kpanic(void);
-	volatile IOSPACE	*sys = (IOSPACE *)IOADDR;
 
-	sys->io_spio = 0x0fa;
+	_sys->io_spio = 0x0fa;
 	
 	txstr("SYSPIPE PANIC!\r\n");
 	txstr("ADDR: "); txhex((int)pipe);
@@ -126,7 +94,7 @@ void	pipe_panic(SYSPIPE *pipe) {
 SYSPIPE *new_syspipe(const unsigned int len) {
 	unsigned	msk;
 
-	for(msk=2; msk<len; msk<<=1)
+	for(msk=16; msk<len; msk<<=1)
 		;
 	SYSPIPE *pipe = sys_malloc(sizeof(SYSPIPE)-1+msk);
 	pipe->m_mask = msk-1;

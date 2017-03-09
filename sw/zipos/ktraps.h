@@ -56,7 +56,8 @@ typedef	enum {
 	//		If the timeout < 0, clears any pending timeout wakeup
 	//		If the timeout > 0, sets a pending timeout wakeup and
 	//			returns.
-	//		If the timeout == 0, does nothing.
+	//		If the timeout == 0, clears the respective interrupt
+	//			slash event, and does nothing more.
 	TRAPID_WAIT, TRAPID_CLEAR, TRAPID_POST,
 	// Yield: Yields the processor until the next scheduled time slice.
 	TRAPID_YIELD,

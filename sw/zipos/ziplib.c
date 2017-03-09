@@ -5,5 +5,7 @@ void *memset(void *s, int c, unsigned n) {
 	do {
 		*p++ = c;
 	} while(n-- > 0);
+
+	return s;
 }
 

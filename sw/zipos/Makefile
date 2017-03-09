@@ -42,48 +42,55 @@ CC      := $(CROSS)gcc
 AS	:= $(CROSS)as
 OBJDUMP := $(CROSS)objdump
 OBJDIR  := obj-zip
-DEVSRCSR:= display.c keypad.c rtcsim.c
+DEVSRCSR:= display.c keypad.c rtcsim.c txfns.c
 DEVSRCS := $(addprefix ../dev/,$(DEVSRCSR))
 DEVOBJS := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(DEVSRCSR)))
-SOURCES := bootloader.c kernel.c ksetup.c syspipe.c pipesetup.c taskp.c doorbell.c zipsys.c # ziplib.c
+SOURCES := bootloader.c kernel.c ksetup.c syspipe.c pipesetup.c taskp.c doorbell.c zipsys.c string.c # ziplib.c
 OBJECTS := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(SOURCES))) $(DEVOBJS) $(OBJDIR)/resetdump.o
 HEADERS := $(wildcard *.h) $(subst .c,.h,$(DEVSRCS))
 # CFLAGS  := -O3 -fdump-tree-all -Wall -Wextra -nostdlib -fno-builtin
 # CFLAGS  := -O3 -fdump-rtl-all -DZIPOS -Wall -Wextra -nostdlib -fno-builtin
-CFLAGS  := -O3 -DZIPOS -Wall -Wextra -nostdlib -fno-builtin
-# CFLAGS  := -Wall -Wextra -nostdlib -fno-builtin
-LDFLAGS := -T cmodram.ld -Wl,-Map,$(OBJDIR)/doorbell.map
+CFLAGS  := -I. -I../dev -Os -DZIPOS -Wall -Wextra -nostdlib -fno-builtin -Wa,-nocis
+LDFLAGS := -T cmodram.ld -Wl,-Map,$(OBJDIR)/doorbell.map -nostdlib
 
-all: $(OBJDIR)/ doorbell
+all: doorbell
 $(OBJDIR)/:
-	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+	$(mk-objdir)
 
 %.o: $(OBJDIR)/%.o
-	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.o: %.c
+	$(mk-objdir)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.o: ../dev/%.c
+	$(mk-objdir)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.txt: $(OBJDIR)/%.o
-	$(OBJDUMP) -d $^ -o $@
+	$(OBJDUMP) -Dr $^ > $@
 
 $(OBJDIR)/%.s: %.c
+	$(mk-objdir)
 	$(CC) -S $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.s: ../dev/%.c
+	$(mk-objdir)
 	$(CC) -S $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/resetdump.o: resetdump.s
-	$(AS) $^ -o $@
+	$(mk-objdir)
+	$(AS) -nocis $^ -o $@
 
 doorbell: $(OBJECTS) cmodram.ld
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
-$(OBJDIR)/doorbell.txt: doorbell
+doorbell.txt: doorbell
 	$(OBJDUMP) -d $^ > $@
+
+define	mk-objdir
+	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+endef
 
 define	build-depends
 	@echo "Building dependency file(s)"
@@ -93,7 +100,8 @@ define	build-depends
 endef
 
 .PHONY: depends
-depends: $(OBJDIR)/ tags
+depends: tags
+	$(mk-objdir)
 	$(build-depends)
 
 tags: $(SOURCES) $(HEADERS)

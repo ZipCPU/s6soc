@@ -39,6 +39,7 @@
 #include "ksched.h"
 #include "kfildes.h"
 #include "taskp.h"
+#include "txfns.h"
 
 extern	void *sys_malloc(int sz);
 TASKP	new_task(unsigned ln, VENTRYP entry) {
@@ -47,11 +48,11 @@ TASKP	new_task(unsigned ln, VENTRYP entry) {
 
 	for(i=0; (unsigned)i<sizeof(struct TASK_S)+ln; i++)
 		((unsigned int *)tsk)[i] = 0;
-	tsk->context[ 0] = (int)((long)(int *)idle_task);
+	tsk->context[ 0] = (int)(idle_task);
 	tsk->context[12] = (int)&tsk->user_data[ln]; // Set the stack pointer
 	tsk->context[13] = (int)&tsk->user_data[ln]; // Set the stack pointer
 	tsk->context[14] = 0x20; // GIE bit only
-	tsk->context[15] = (int)((long)(int *)entry);
+	tsk->context[15] = (int)((int *)entry);
 	tsk->user_heap   = &tsk->user_data[0];
 	tsk->state = SCHED_READY;
 

@@ -34,18 +34,38 @@ ENTRY(_start)
 
 MEMORY
 {
-	blkram (wx) : ORIGIN = 0x002000, LENGTH = 0x001000
-	flash  (rx) : ORIGIN = 0x400000, LENGTH = 0x400000
+	blkram (wx) : ORIGIN = 0x0004000, LENGTH = 0x0004000
+	flash  (rx) : ORIGIN = 0x1000000, LENGTH = 0x1000000
 }
 
-_top_of_stack = ORIGIN(blkram) + LENGTH(blkram) - 1;
+_flash	= ORIGIN(flash);
+_blkram	= ORIGIN(blkram);
+_sdram	= 0;
+_top_of_stack = ORIGIN(blkram) + LENGTH(blkram) - 4;
+_sdram_image_start = 0;
+_sdram_image_end   = 0;
 
 SECTIONS
 {
-  . = 0x0480000;
-  .rocode 0x0480000 : { *(.start) *(.text)
-	*(.rodata)
-	*(.strings) } > flash
-  .data : { *(.fixdata) *(.data) *(COMMON) *(.bss) } > blkram
-  _top_of_heap = .;
+	.rocode 0x1200000 : {
+		_boot_address = .;
+		*(.start) *(.boot)
+		*(.text*)
+		*(.rodata*)
+		*(.strings*)
+		} > flash
+	_kernel_image_start = . ;
+	.data : {
+		*(.kernel*)
+		*(.fixdata*)
+		*(.data*)
+		*(COMMON*)
+		_kernel_image_end = . ;
+		}> blkram AT> flash
+	_blkram_image_end = . ;
+	.bss : {
+		*(.bss*)
+		_bss_image_end = . ;
+		} > blkram
+	_top_of_heap = .;
 }

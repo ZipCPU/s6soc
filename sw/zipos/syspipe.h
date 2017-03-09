@@ -46,7 +46,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -73,7 +73,9 @@
 #ifndef	SYSPIPE_H
 #define	SYSPIPE_H
 
-extern	void *sys_malloc(int sz);
+typedef	unsigned size_t;
+
+extern	void *sys_malloc(size_t sz);
 
 typedef struct {
 	unsigned int	m_mask;
@@ -83,14 +85,15 @@ volatile TASKP		m_rdtask, m_wrtask;
 	int	dummy;
 	int		m_error;
 
-	int		m_buf[1];
+	char		m_buf[1];
 } SYSPIPE;
 
 SYSPIPE *new_syspipe(const unsigned int len);
-extern	void	kread_syspipe( TASKP tsk, int dev, int *dst, int len);
-extern	void	kwrite_syspipe(TASKP tsk, int dev, int *src, int len);
-void	kpush_syspipe(SYSPIPE *p, int val);
-int	kpop_syspipe(SYSPIPE *p, int *val);
+extern	void	kread_syspipe( TASKP tsk, int dev, char *dst, int len);
+extern	void	kwrite_syspipe(TASKP tsk, int dev, char *src, int len);
+void	kpush_syspipe(SYSPIPE *p, char val);
+int	kpop_syspipe(SYSPIPE *p, char *val);
+int	kpop_short_syspipe(SYSPIPE *p, unsigned short *val);
 extern	int	num_avail_syspipe(SYSPIPE *p);
 extern	int	len_syspipe(SYSPIPE *p);
 

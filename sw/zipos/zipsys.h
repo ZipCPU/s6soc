@@ -79,13 +79,11 @@ extern	int	syscall(const int,int,int,int);
 #endif
 
 static inline void	DISABLE_INTS(void) {
-	IOSPACE *sys = (IOSPACE *)IOADDR;
-	sys->io_pic = 0;
+	_sys->io_pic = 0;
 }
 
 static inline void	ENABLE_INTS(void) {
-	IOSPACE *sys = (IOSPACE *)IOADDR;
-	sys->io_pic = INT_ENABLE;
+	_sys->io_pic = INT_ENABLE;
 }
 
 #endif

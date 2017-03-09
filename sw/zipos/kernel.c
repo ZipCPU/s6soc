@@ -72,12 +72,13 @@ extern TASKP	*ksetup(void);
 
 int	LAST_TASK;
 
+extern void txstr(const char *);
+
 void	kernel_entry(void) {
 	int	nheartbeats= 0, tickcount = 0, milliseconds=0, ticks = 0;
 	int	audiostate = 0, buttonstate = 0;
 	TASKP	*tasklist, current;
 	int	*last_context;
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
 
 	tasklist = ksetup();
 
@@ -87,15 +88,16 @@ void	kernel_entry(void) {
 
 	unsigned enableset = 
 		INT_ENABLEV(INT_BUTTON)
-		|INT_ENABLEV(INT_TIMA)
+		|INT_ENABLEV(INT_TIMER)
 		// |INT_ENABLEV(INT_UARTRX)
 		// |INT_ENABLEV(INT_UARTTX) // Needs to be turned on by driver
 		// |INT_ENABLEV(INT_AUDIO // Needs to be turned on by driver)
 		// |INT_ENABLEV(INT_GPIO)
-		// |INT_ENABLEV(INT_TIMB);
 		;
 	// Then selectively turn some of them back on
-	sys->io_pic = INT_ENABLE | enableset | 0x07fff;
+	_sys->io_pic = INT_ENABLE | enableset | 0x07fff;
+
+	txstr("HEAP: "); txhex(heap);
 
 	do {
 		int need_resched = 0, context_has_been_saved, pic;
@@ -105,11 +107,11 @@ void	kernel_entry(void) {
 
 		last_context = current->context;
 		context_has_been_saved = 0;
-		pic = sys->io_pic;
+		pic = _sys->io_pic;
 
 		if (pic & 0x8000) { // If there's an active interrupt
 			// Interrupt processing
-			sys->io_spio = 0x44;
+			_sys->io_spio = 0x44;
 
 			// First, turn off pending interrupts
 			// Although we migt just write 0x7fff7fff to the
@@ -119,74 +121,74 @@ void	kernel_entry(void) {
 			// know about.
 			pic &= 0x7fff;
 			// Acknowledge current ints, and turn off pending ints
-			sys->io_pic = INT_DISABLEV(pic)|(INT_CLEAR(pic));
-			if(pic&INT_TIMA) {
+			_sys->io_pic = INT_DISABLEV(pic)|(INT_CLEAR(pic));
+			if(pic&INT_TIMER) {
 				if (++ticks >= TICKS_PER_SECOND) {//(pic & SYSINT_PPS)
 					// Toggle the low order LED
 					tickcount++;
 					ticks = 0;
-					sys->io_spio = ((sys->io_spio&1)^1)|0x010;
+					_sys->io_spio = ((_sys->io_spio&1)^1)|0x010;
 					pic |= SWINT_CLOCK;
 				}
 				if (buttonstate)
 					buttonstate--;
-				else
+				else if ((_sys->io_spio & 0x0f0)==0)
 					enableset |= INT_ENABLEV(INT_BUTTON);
 			}
 			// 
 			if (pic&INT_BUTTON) {
 				// Need to turn the button interrupt off
 				enableset &= ~(INT_ENABLEV(INT_BUTTON));
-				if ((sys->io_spio&0x0f0)==0x030)
+				if ((_sys->io_spio&0x0f0)==0x030)
 					kpanic();
-				buttonstate = 3;
+				if (buttonstate)
+					pic &= ~INT_BUTTON;
+				buttonstate = 50;
 			}
 			if (pic & INT_UARTRX) {
-				int v = sys->io_uart;
+				int v = _sys->io_uart;
 	
 				if ((v & (~0x7f))==0) {
 					kpush_syspipe(rxpipe, v);
 
 					// Local Echo
 					if (pic & INT_UARTTX) {
-						sys->io_uart = v;
-						sys->io_pic = INT_UARTTX;
+						_sys->io_uart = v;
+						_sys->io_pic = INT_UARTTX;
 						pic &= ~INT_UARTTX;
 					}
 				}
 			} if (pic & INT_UARTTX) {
-				int	v;
-				if (kpop_syspipe(txpipe, &v)==0) {
+				char	ch;
+				if (kpop_syspipe(txpipe, &ch)==0) {
+					unsigned	v = ch;
 					enableset |= (INT_ENABLEV(INT_UARTTX));
-					sys->io_uart= v;
-					sys->io_pic = INT_UARTTX;
+					_sys->io_uart= v;
+					_sys->io_pic = INT_UARTTX;
 					// if (v == 'W')
-						// sys->io_timb = 5;
+						// sys->io_watchdog = 5;
 						// 75k was writing the 'e'
 				} else
-					enableset &= ~(INT_ENABLEV(INT_UARTTX));
+					enableset&= ~(INT_DISABLEV(INT_UARTTX));
 			} if (audiostate) {
 				if (pic & INT_AUDIO) {
-				int v;
+				unsigned short	sample;
+
 				// States: 
 				//	0 -- not in use
-				//	1 -- First sample, buffer empty
-				//		time to read a new sample
-				//	2 -- second sample,  to read new
-				//	3 -- Need to turn off
-				if ((audiostate & 3)==2) {
-					sys->io_pwm_audio = (audiostate>>2)&0x0ffff;
-					audiostate = 1;
-				} else if (kpop_syspipe(pwmpipe, &v)==0) {
-					audiostate = (2|(v<<2))&0x03ffff;
-					sys->io_pwm_audio = (v>>16)&0x0ffff;
+				//	1 -- in use
+
+				if (kpop_short_syspipe(pwmpipe, &sample)==0) {
+					_sys->io_pwm_audio = sample;
+					_sys->io_spio = 0x022;
+					// audiostate = 1;
 				} else {
 					audiostate = 0;
 					// Turn the device off
-					sys->io_pwm_audio = 0x10000;
+					_sys->io_pwm_audio = 0x10000;
 					// Turn the interrupts off
 					enableset &= ~(INT_ENABLEV(INT_AUDIO));
-					sys->io_spio = 0x020;
+					_sys->io_spio = 0x020;
 				}
 
 				// This particular interrupt cannot be cleared
@@ -195,46 +197,50 @@ void	kernel_entry(void) {
 				// it now.  If it needs retriggering, the port
 				// will retrigger itself -- despite being
 				// cleared here.
-				sys->io_pic = INT_AUDIO;
-			}} else { // if (audiostate == 0)
-				int	sample;
-				if (kpop_syspipe(pwmpipe, &sample)==0) {
-					audiostate = (2|(sample<<2))&0x03ffff;
-					sys->io_pwm_audio = 0x310000 | ((sample>>16)&0x0ffff);
+				_sys->io_pic = INT_AUDIO;
+			}}
+/*
+			else { // if (audiostate == 0)
+				unsigned short	sample;
+
+				if (kpop_short_syspipe(pwmpipe, &sample)==0) {
+					audiostate = 1;
+					_sys->io_pwm_audio = 0x310000 | sample;
 					enableset |= (INT_ENABLEV(INT_AUDIO));
-					sys->io_spio = 0x022;
-					sys->io_pic = INT_AUDIO;
+					_sys->io_spio = 0x022;
+					_sys->io_pic = INT_AUDIO;
 				} // else sys->io_spio = 0x020;
 			}
+*/
 			milliseconds = kpost(tasklist, pic, milliseconds);
 
 			// Restart interrupts
 			enableset &= (~0x0ffff); // Keep the bottom bits off
-			sys->io_pic = INT_ENABLE|enableset;
+			_sys->io_pic = INT_ENABLE|enableset;
 		} else {
-			sys->io_pic = INT_ENABLE; // Make sure interrupts are on
-			int	sample;
+			_sys->io_pic = INT_ENABLE; // Make sure interrupts are on
+			unsigned short	sample;
 
 			// Check for the beginning of an audio pipe.  If the
 			// interrupt is not enabled, we still might need to
 			// enable it.
-			if ((audiostate==0)&&(kpop_syspipe(pwmpipe, &sample)==0)) {
-				audiostate = (2|(sample<<2))&0x03ffff;
-				sys->io_pwm_audio = 0x310000 | ((sample>>16)&0x0ffff);
-				sys->io_pic = INT_AUDIO;
+
+			if ((audiostate==0)&&(kpop_short_syspipe(pwmpipe, &sample)==0)) {
+				audiostate = 1;
+				_sys->io_pwm_audio = 0x310000 | (sample);
+				_sys->io_pic = INT_AUDIO;
 				enableset |= (INT_ENABLEV(INT_AUDIO));
-				sys->io_spio = 0x022;
+				_sys->io_spio = 0x022;
 			} // else sys->io_spio = 0x020;
 
 			// Or the beginning of a transmit pipe.  
 			if (pic & INT_UARTTX) {
-				int	v;
-				if (kpop_syspipe(txpipe, &v)==0) {
+				char	ch;
+				if (kpop_syspipe(txpipe, &ch)==0) {
+					unsigned	v = ch;
 					enableset |= (INT_ENABLEV(INT_UARTTX));
-					sys->io_uart = v;
-					sys->io_pic = INT_UARTTX;
-					// if (v == 'W')
-						// sys->io_timb = 5;
+					_sys->io_uart = v;
+					_sys->io_pic = INT_UARTTX;
 				} else
 					enableset &= ~(INT_ENABLEV(INT_UARTTX));
 			}
@@ -244,9 +250,9 @@ void	kernel_entry(void) {
 			// as syspipe() accomplishes within uwrite_syspipe()
 			// (We also might've just turned them off ... ooops)
 			enableset &= (~0x0ffff); // Keep the bottom bits off
-			sys->io_pic = INT_ENABLE | enableset;
+			_sys->io_pic = INT_ENABLE | enableset;
 		}
-		sys->io_spio = 0x40;
+		_sys->io_spio = 0x40;
 
 		int zcc = zip_ucc();
 		if (zcc & CC_TRAPBIT) {
@@ -354,8 +360,7 @@ void	kernel_entry(void) {
 			restore_context(last_context);
 		} else if (zcc & (CC_BUSERR|CC_DIVERR|CC_FPUERR|CC_ILL)) {
 			current->state = SCHED_ERR;
-			// current->errno = -EBUS;
-			current->errno = (int)sys->io_buserr;
+			current->errno = (int)_sys->io_buserr;
 			save_context(last_context);
 			context_has_been_saved = 1;
 			kpanic();
@@ -409,7 +414,7 @@ TASKP	kschedule(int LAST_TASK, TASKP *tasklist, TASKP last) {
 
 int	kpost(TASKP *tasklist, unsigned events, int milliseconds) {
 	int	i;
-	if (events & INT_TIMA)
+	if (events & INT_TIMER)
 		milliseconds++;
 	if (milliseconds<0) {
 		milliseconds -= 0x80000000;

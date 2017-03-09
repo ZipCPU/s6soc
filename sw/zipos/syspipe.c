@@ -46,12 +46,13 @@
 #include "syspipe.h"
 #include "zipsys.h"
 #include "ktraps.h"
+#include "string.h"
 
 #ifndef	NULL
 #define	NULL	(void *)0
 #endif
 
-void	kpush_syspipe(SYSPIPE *pipe, int val) {
+void	kpush_syspipe(SYSPIPE *pipe, char val) {
 	int	tst = (pipe->m_head+1)&pipe->m_mask;
 	if (tst != pipe->m_tail) {
 		pipe->m_buf[pipe->m_head] = val;
@@ -62,8 +63,15 @@ void	kpush_syspipe(SYSPIPE *pipe, int val) {
 }
 
 extern	void	pipe_panic(SYSPIPE *p);
-int	kpop_syspipe(SYSPIPE *pipe, int *vl) {
+/*
+ * kpop_syspipe
+ *
+ * Called from an interrupt context to pop one byte off of the syspipe.
+ */
+int	kpop_syspipe(SYSPIPE *pipe, char *vl) {
 	if (pipe->m_head != pipe->m_tail) {
+		// The head will *only* equal the tail if the pipe is empty.
+		// We come in here, therefore, if the pipe is non-empty
 		*vl = pipe->m_buf[pipe->m_tail];
 		pipe->m_tail = (pipe->m_tail+1)&pipe->m_mask;
 		if (pipe->m_wrtask)
@@ -71,6 +79,25 @@ int	kpop_syspipe(SYSPIPE *pipe, int *vl) {
 		return 0;
 	}
 	return 1; // Error condition
+}
+
+/*
+ * kpop_short_syspipe
+ *
+ * This is identical to kpop_syspipe, save that we are pulling a short value
+ * off of the syspipe (i.e. a pair of chars), not just a single char.
+ */
+int	kpop_short_syspipe(SYSPIPE *pipe, unsigned short *vl) {
+	if (pipe->m_head == pipe->m_tail)
+		return 1; // Error condition
+
+	unsigned short *sptr = (unsigned short *)&pipe->m_buf[pipe->m_tail];
+	// sv = pipe->m_buf[pipe->m_tail];
+	*vl = *sptr;;
+	pipe->m_tail = (pipe->m_tail+2)&pipe->m_mask;
+	if (pipe->m_wrtask)
+		pipe->m_wrtask->state = SCHED_READY;
+	return 0;
 }
 
 /*
@@ -95,7 +122,8 @@ int	num_avail_syspipe(SYSPIPE *p) {
 // Another task may write to the pipe during this call.  If the pipe becomes
 // full, that task will block.
 //
-static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int *dst, int len) {
+static int uread_syspipe(TASKP tsk __attribute__((__unused__)),
+		SYSPIPE *p, char *dst, int len) {
 	int nleft= len, h;
 	if (len == 0) {
 		// We'll only get here if we were released from within a 
@@ -115,9 +143,8 @@ static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int 
 			int ln1 = p->m_mask+1 - p->m_tail; // Navail to be read
 			ln1 = (ln1 > nleft) ? nleft : ln1;
 			if (ln1 > 0) {
-				register int *src = &p->m_buf[p->m_tail];
-				for(int i=0; i<ln1; i++)
-					*dst++ = *src++;
+				memcpy(dst, &p->m_buf[p->m_tail], ln1);
+				dst += ln1;
 
 				p->m_nread += ln1;
 				nleft -= ln1;
@@ -143,9 +170,8 @@ static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int 
 			int ln1 = h - p->m_tail;
 			ln1 = (ln1 < nleft) ? ln1 : nleft;
 
-			int *src = &p->m_buf[p->m_tail];
-			for(int i=0; i<ln1; i++)
-				*dst++ = *src++;
+			memcpy(dst, &p->m_buf[p->m_tail], ln1);
+			dst += ln1;
 
 			p->m_nread += ln1;
 			nleft -= ln1;
@@ -171,7 +197,8 @@ static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int 
 		// pointer.  It can change from one time through our loop
 		// to the next.
 		if (((volatile SYSPIPE *)p)->m_wrtask) {
-			int	*src, ln;
+			int	ln;
+			char	*src;
 
 			// If the head changed before the write task blocked,
 			// then go around again and copy some more before
@@ -188,10 +215,10 @@ static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int 
 			ln = nleft;
 			if (p->m_wrtask->context[4] < nleft)
 				ln = p->m_wrtask->context[4];
-			src = (int *)p->m_wrtask->context[3];
-
-			for(int i=0; i<ln; i++)
-				*dst++ = *src++;
+			src = (char *)p->m_wrtask->context[3];
+			memcpy(dst, src, ln);
+			dst += ln;
+			src += ln;
 
 			p->m_nwritten += ln;
 			p->m_nread    += ln;
@@ -243,7 +270,7 @@ static int	uread_syspipe(TASKP tsk __attribute__((__unused__)), SYSPIPE *p, int 
 }
 
 static int	uwrite_syspipe(TASKP tsk __attribute__((__unused__)),
-		SYSPIPE *p, int *src, int len) {
+		SYSPIPE *p, char *src, int len) {
 	int nleft = len;
 
 	// The kernel guarantees, before we come into here, that we have a 
@@ -262,9 +289,8 @@ static int	uwrite_syspipe(TASKP tsk __attribute__((__unused__)),
 			int ln = nleft;
 			if (ln > p->m_rdtask->context[4])
 				ln = p->m_rdtask->context[4];
-			int *dst = (int *)p->m_rdtask->context[3];
-			for(int i=0; i<ln; i++)
-				*dst++ = *src++;
+			memcpy((char *)p->m_rdtask->context[3], src, ln);
+			src += ln;
 			p->m_nread += ln;
 			p->m_rdtask->context[3]+= ln;
 			p->m_rdtask->context[4]-= ln;
@@ -317,34 +343,17 @@ static int	uwrite_syspipe(TASKP tsk __attribute__((__unused__)),
 			// so that it remains consistent under interrupt
 			// conditions.
 				int ln = p->m_mask+1-p->m_head;
-				int *dst = &p->m_buf[p->m_head];
 				if (ln > nleft) ln = nleft;
 				if (ln > navail) ln = navail;
 
-				for(int i=0; i<ln; i++)
-					*dst++ = *src++;
+				memcpy((void *)&p->m_buf[p->m_head], src, ln);
+				src += ln;
 
 				p->m_head = (p->m_head+ln)&p->m_mask;
-				nleft -= ln;
-				p->m_nwritten += ln;
-				navail -= ln;
+				nleft		-= ln;
+				p->m_nwritten	+= ln;
+				navail		-= ln;
 			}
-
-			/*
-			// Write into the rest of the pipe
-			if ((0 == p->m_head)&&(nleft>0)&&(navail>0)) {
-				int ln = navail;
-				if (nleft < ln)
-					ln = nleft;
-				int *dst = &p->m_buf[p->m_head];
-
-				for(int i=0; i<ln; i++)
-					*dst++ = *src++;
-
-				p->m_head += ln;
-				p->m_nwritten += ln;
-				nleft -= ln;
-			}*/
 		}
 
 		if ((nleft > 0)&&(navail == 0)) {
@@ -370,7 +379,7 @@ static int	uwrite_syspipe(TASKP tsk __attribute__((__unused__)),
 }
 
 // This will be called from a kernel (interrupt) context
-void	kread_syspipe(TASKP tsk, int dev, int *dst, int len) {
+void	kread_syspipe(TASKP tsk, int dev, char *dst, int len) {
 	SYSPIPE	*p = (SYSPIPE *)dev;
 	if (p->m_rdtask != NULL) {
 		// If the pipe already has a read task, then we fail
@@ -414,7 +423,7 @@ void	kread_syspipe(TASKP tsk, int dev, int *dst, int len) {
 	}
 }
 
-void	kwrite_syspipe(TASKP tsk, int dev, int *src, int len) {
+void	kwrite_syspipe(TASKP tsk, int dev, char *src, int len) {
 	SYSPIPE	*p = (SYSPIPE *)dev;
 	if (p->m_wrtask != NULL) {
 		// If the pipe already has a write task, then we fail

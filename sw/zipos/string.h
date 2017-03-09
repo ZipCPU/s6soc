@@ -1,19 +1,17 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	bootloader.c
+// Filename: 	string.h
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	To copy into RAM, upon boot, sections from the FLASH that
-//		need to be placed into RAM.  This also handles setting initial
-//		values.
+// Purpose:	
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -26,7 +24,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -37,25 +35,15 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "board.h"
-#include "bootloader.h"
+#ifndef	STRING_H
+#define	STRING_H
 
-// These values will be filled in by the linker.  They are unknown at compile
-// time.
+typedef	unsigned size_t;
 
-void	_bootloader(void) __attribute__ ((section(".boot")));
+size_t	strlen(const char *s);
+char	*strcpy(char *d, const char *s);
+char	*strcat(char *d, const char *s);
+//
+void	*memcpy(void *d, const void *s, size_t n);
 
-void	_bootloader(void) {
-	int	*flash = _kernel_image_start;
-	int	*mem = _blkram;
-
-	while(mem < _kernel_image_end)
-		*mem++ = *flash++;
-
-	// While I'd love to continue and clear to the end of memory, doing
-	// so will corrupt my stack and perhaps even my return address.  Hence
-	// we only do this much.
-	while(mem < _bss_image_end)
-		*mem++ = 0;
-}
-
+#endif

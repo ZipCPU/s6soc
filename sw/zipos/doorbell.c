@@ -53,10 +53,17 @@
 #include "ktraps.h"
 #include "errno.h"
 #include "swint.h"
+#include "txfns.h"
 
 #include "../dev/display.h"
 #include "../dev/rtcsim.h"
 #include "../dev/keypad.h"
+
+typedef	unsigned	size_t;
+
+size_t	strlen(const char *);
+char *strcat(char *, const char *);
+char *strcpy(char *, const char *);
 
 /* Our system will need some pipes to handle ... life.  How about these:
  *
@@ -140,6 +147,14 @@
  */
 #define	DOORBELL_TASK	doorbell_task_id
 
+
+/*
+ * Just print Hello World every 15 seconds or so.  This is really a test of the
+ * write() and txpipe infrastructure, but not really a valid part of the task.
+ *
+ */
+// #define	HELLO_TASK	hello_task_id
+
 #define	LAST_TASK	last_task_id
 
 typedef	enum	{
@@ -157,8 +172,8 @@ typedef	enum	{
 #ifdef	MENU_TASK
 	MENU_TASK,
 #endif
-#ifdef	COMMAND_TASK
-	COMMAND_TASK,
+#ifdef	HELLO_TASK
+	HELLO_TASK,
 #endif
 	LAST_TASK
 } TASKNAME;
@@ -168,7 +183,8 @@ void	rtctask(void),
 	doorbell_task(void),
 	display_task(void),
 	keypad_task(void),
-	menu_task(void);
+	menu_task(void),
+	hello_task(void);
 	// idle_task ... is accomplished within the kernel
 extern	void	restore_context(int *), save_context(int *);
 extern	SYSPIPE	*rxpipe, *txpipe, *pwmpipe, *lcdpipe;
@@ -179,37 +195,46 @@ int	kntasks(void) {
 	return LAST_TASK;
 } void	kinit(TASKP *tasklist) {
 #ifdef	RTCCLOCK_TASK
-	//
-	tasklist[RTCCLOCK_TASK]    = new_task(16, rtctask);
+	// Stack = 36 (rtctask) + 4(rtcdatenext)
+	tasklist[RTCCLOCK_TASK]    = new_task(64, rtctask);
 #endif
 
 #ifdef	DOORBELL_TASK
 #ifdef	DISPLAY_TASK
-	// 13 + 10 +9(uwrite)+4(uarthex)+2(uartstr)+2(uartchr)
-	tasklist[DOORBELL_TASK]    = new_task(96, doorbell_task);
+	// Stack = 36 + 36 (uread/write) + 24(memcpy) + 32(uarthex)+8(uartchr)
+	tasklist[DOORBELL_TASK]    = new_task(256, doorbell_task);
 //	tasklist[DOORBELL_TASK]->fd[FILENO_STDOUT]= kopen((int)lcdpipe,pipedev);
 	tasklist[DOORBELL_TASK]->fd[FILENO_STDERR]= kopen((int)txpipe, pipedev);
 	tasklist[DOORBELL_TASK]->fd[FILENO_AUX] = kopen((int)pwmpipe,  pipedev);
 
-	//
-	tasklist[DISPLAY_TASK] = new_task(32, display_task);
+	// Stack = 16 + 36(uread/write) + 24(memcpy)
+	tasklist[DISPLAY_TASK] = new_task(128, display_task);
 	tasklist[DISPLAY_TASK]->fd[FILENO_STDIN] = kopen((int)lcdpipe,pipedev);
 #endif
 #endif
 
 
 #ifdef	KEYPAD_TASK
-	// Stack = 7 + 9(uwrite) + 2*4
-	tasklist[KEYPAD_TASK] = new_task(32, keypad_task);
+	// Stack = 28 + 36(uwrite) + 24(memcpy)		= 88 bytes
+	tasklist[KEYPAD_TASK] = new_task(128, keypad_task);
 	tasklist[KEYPAD_TASK]->fd[FILENO_STDOUT] = kopen((int)keypipe,pipedev);
 #endif
 #ifdef	MENU_TASK
-	// Stack = 18 + 10(showbell/shownow) + 9(uwrite) + 2(menu_readkey)
-	//		+ 18 (time_menu/dawn_menu/dusk_menu)
-	tasklist[MENU_TASK] = new_task(72, menu_task);
+	// Stack = 76   + 48(showbell/shownow)
+	//		+ 36(uwrite)
+	//		+  8(menu_readkey)
+	//		+ 24(memcpy)
+	//		+100(time_menu/dawn_menu/dusk_menu)
+	//
+	tasklist[MENU_TASK] = new_task(512, menu_task);
 	// tasklist[MENU_TASK]->fd[FILENO_STDIN] = kopen((int)keypipe,pipedev);
 	tasklist[MENU_TASK]->fd[FILENO_STDOUT]= kopen((int)lcdpipe,pipedev);
 	tasklist[MENU_TASK]->fd[FILENO_STDERR]= kopen((int)txpipe, pipedev);
+#endif
+
+#ifdef	HELLO_TASK
+	tasklist[HELLO_TASK] = new_task(512, hello_task);
+	tasklist[HELLO_TASK]->fd[FILENO_STDOUT]= kopen((int)txpipe,pipedev);
 #endif
 }
 
@@ -223,60 +248,58 @@ unsigned	dawn = 0x060000, dusk = 0x180000;
 const unsigned	dawn = 0x060000, dusk = 0x180000;
 #endif
 
-void	shownow(unsigned now) {	// Uses 10 stack slots + 8 for write()
-	char	dmsg[9];
-	dmsg[0] = PACK(0x1b,'[','j','T');
-	dmsg[1] = PACK('i','m','e',':');
-	dmsg[2] = PACK(' ',((now>>20)&0x3)+'0',
-			((now>>16)&0xf)+'0',':');
-	dmsg[3] = PACK( ((now>>12)&0xf)+'0',
-			((now>> 8)&0xf)+'0',
-			':',
-			((now>> 4)&0xf)+'0');
-	dmsg[4] = PACK( ((now    )&0xf)+'0',
-			0x1b, '[', '1');
-	dmsg[5] = PACK(';','0','H',' ');
+const char	basemsg[]   = "\e[jTime: xx:xx:xx\e[1;0H ";
+const	char	nighttime[] = "Night time";
+const	char	daylight[]  = "Daylight!";
+const	char	dbellstr[]  = "Doorbell!";
+void	shownow(unsigned now) {
+	char	dmsg[40];
+	strcpy(dmsg, basemsg);
+
+	dmsg[ 9] = ((now>>20)&0x0f)+'0';
+	dmsg[10] = ((now>>16)&0x0f)+'0';
+	//
+	dmsg[12] = ((now>>12)&0x0f)+'0';
+	dmsg[13] = ((now>> 8)&0x0f)+'0';
+	//
+	dmsg[15] = ((now>> 4)&0x0f)+'0';
+	dmsg[16] = ((now    )&0x0f)+'0';
+
 	if ((now < dawn)||(now > dusk)) {
-		dmsg[6] = PACK('N','i','g','h');
-		dmsg[7] = PACK('t',' ','t','i');
-		dmsg[8] = PACK('m','e',0,0);
+		strcat(dmsg, nighttime);
 	} else {
-		dmsg[6] = PACK('D','a','y','l');
-		dmsg[7] = PACK('i','g','h','t');
-		dmsg[8] = PACK('!',' ',0,0);
-	} write(FILENO_STDOUT, dmsg, 9);
+		strcat(dmsg, daylight);
+	} write(FILENO_STDOUT, dmsg, strlen(dmsg));
 }
 
 void	showbell(unsigned now) {	// Uses 10 stack slots + 8 for write()
-	char	dmsg[9];
-	dmsg[0] = PACK(0x1b,'[','j','T');
-	dmsg[1] = PACK('i','m','e',':');
-	dmsg[2] = PACK(' ',((now>>20)&0x3)+'0',
-			((now>>16)&0xf)+'0',':');
-	dmsg[3] = PACK( ((now>>12)&0xf)+'0',
-			((now>> 8)&0xf)+'0',
-			':',
-			((now>> 4)&0xf)+'0');
-	dmsg[4] = PACK( ((now    )&0xf)+'0',
-			0x1b, '[', '1');
-	dmsg[5] = PACK(';','0','H',' ');
-	dmsg[6] = PACK('D','o','o','r');
-	dmsg[7] = PACK('b','e','l','l');
-	dmsg[8] = PACK('!',' ',0,0);
-	write(FILENO_STDOUT, dmsg, 9);
+	char	dmsg[40];
+
+	strcpy(dmsg, basemsg);
+
+	dmsg[ 9] = ((now>>20)&0x0f)+'0';
+	dmsg[10] = ((now>>16)&0x0f)+'0';
+	//
+	dmsg[12] = ((now>>12)&0x0f)+'0';
+	dmsg[13] = ((now>> 8)&0x0f)+'0';
+	//
+	dmsg[15] = ((now>> 4)&0x0f)+'0';
+	dmsg[16] = ((now    )&0x0f)+'0';
+
+	strcat(dmsg, dbellstr);
+	write(FILENO_STDOUT, dmsg, strlen(dmsg));
 }
 
 void	uartchr(char v) {
 	if (write(FILENO_STDERR, &v, 1) != 1)
-		write(FILENO_STDERR, "APPLE-PANIC", 11);
+		write(FILENO_STDERR, "APPLE-PANIC\r\n", 13);
 }
 
 void	uartstr(const char *str) {
-	int	cnt=0;
-	while(str[cnt])
-		cnt++;
+	int	cnt;
+	cnt = strlen(str);
 	if (cnt != write(FILENO_STDERR, str, cnt))
-		write(FILENO_STDERR, "PIPE-PANIC", 10);
+		write(FILENO_STDERR, "PIPE-PANIC\r\n", 12);
 }
 
 void	uarthex(int num) {
@@ -295,11 +318,10 @@ void	uarthex(int num) {
 #include "../dev/samples.c"
 
 void	belllight(unsigned now) {
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
 	if ((now < dawn)||(now > dusk))
-		sys->io_spio = 0x088; // Turn our light on
+		_sys->io_spio = 0x088; // Turn our light on
 	else
-		sys->io_spio = 0x80; // Turn light off
+		_sys->io_spio = 0x80; // Turn light off
 }
 
 void	doorbell_task(void) {
@@ -310,13 +332,12 @@ void	doorbell_task(void) {
 	// write(KFD_STDOUT, disp_build_gtlogo, sizeof(disp_build_gtlogo));
 	// write(KFD_STDOUT, disp_reset_data, sizeof(disp_reset_data));
 	// write(KFD_STDOUT, disp_gtech_data, sizeof(disp_gtech_data));
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
 
 	while(1) {
 		int	event;
 		// Initial state: doorbell is not ringing.  In this state, we
 		// can wait forever for an event
-		sys->io_spio = 0x080; // Turn our light off
+		_sys->io_spio = 0x080; // Turn our light off
 		event = wait(INT_BUTTON|SWINT_PPS,-1);
 
 #ifndef	MENU_TASK
@@ -340,15 +361,15 @@ void	doorbell_task(void) {
 
 			// Check time: should we turn our light on or not?
 			belllight((volatile unsigned)rtcclock);
-			const int *sptr = sound_data;
-			// uartchr('N');
+			const short *sptr = sound_data;
 			while(sptr < &sound_data[NSAMPLE_WORDS]) {
 				int	len = &sound_data[NSAMPLE_WORDS]-sptr;
-				if (len > 256)
-					len = 256;
+				if (len > 512)
+					len = 512;
 
 				// We will stall here, if the audio FIFO is full
-				write(FILENO_AUX, sptr, len);
+				write(FILENO_AUX, sptr,
+					sizeof(sound_data[0])*len);
 				sptr += len;
 
 				// If the user presses the button more than
@@ -398,83 +419,65 @@ void	doorbell_task(void) {
 #endif
 
 #ifdef	MENU_TASK
+const char	menustr[] = "\e[1;0H     :    ";
+
 void	entered_menu_str(char *str, unsigned now,int pos) {
 	//
 	// Set current time
 	//   xx:xx:xx
 	//
-	str[0] = PACK(0x1b, '[', '1',';');
-	str[1] = PACK('0','H',' ',' ');
-	str[2] = PACK(' ','x','x',':');
-	str[3] = PACK('x','x',' ',' ');
-	//str[3]=PACK('x','x',':','x');
-	str[4] = PACK(' ','\0','\0','\0');
-
+	strcpy(str, menustr);
 	if (pos>0) {
 		int ch = ((now >> 20)&0x0f)+'0';
-		str[2] &= ~0x0ff0000;
-		str[2] |= (ch<<16);
+		str[9] = ch;
 
 		if (pos > 1) {
-			int ch = ((now >> 16)&0x0f)+'0';
-			str[2] &= ~0x0ff00;
-			str[2] |= (ch<<8);
+			ch = ((now >> 16)&0x0f)+'0';
+			str[10] = ch;
 
 		if (pos > 2) {
-			int ch = ((now >> 12)&0x0f)+'0';
-			str[3] &= ~0xff000000;
-			str[3] |= (ch<<24);
+			ch = ((now >> 12)&0x0f)+'0';
+			str[12] = ch;
 
 		if (pos > 3) {
 			int ch = ((now >> 8)&0x0f)+'0';
-			str[3] &= ~0x0ff0000;
-			str[3] |= (ch<<16);
+			str[13] = ch;
 
 		if (pos > 4) {
-			int ch = ((now >> 4)&0x0f)+'0';
-			str[3] &= ~0x0ff00;
-			str[3] |= ':'<<8;
-			str[3] &= ~0x0ff;
-			str[3] |= (ch);
+			ch = ((now >> 4)&0x0f)+'0';
+			str[15] = ch;
+			str[14] = ':';
 
 			if (pos > 5)
 				ch = (now&0x0f)+'0';
 			else
 				ch = 'x';
-			str[4] &= ~0x0ff000000;
-			str[4] |= (ch<<24);
-	}}}}}
+			str[16] = ch;
+	}}}}} str[17] = '\0';
 }
+
+const char	timmenu[] = "\e[jSet current time:";
 
 void	show_time_menu(unsigned when, int posn) {
-	char	dmsg[10];
-	dmsg[0] = PACK(0x1b,'[','j','S');
-	dmsg[1] = PACK('e','t',' ','c');
-	dmsg[2] = PACK('u','r','r','e');
-	dmsg[3] = PACK('n','t',' ','t');
-	dmsg[4] = PACK('i','m','e',':');
-	entered_menu_str(&dmsg[5], when, posn);
-	write(FILENO_STDOUT, dmsg, 9);
+	char	dmsg[64];
+	strcpy(dmsg, timmenu);
+	entered_menu_str(&dmsg[20], when, posn);
+	write(FILENO_STDOUT, dmsg, strlen(dmsg));
 }
 
+const char	dawnmenu[] = "\e[jSet sunrise: ";
 void	show_dawn_menu(unsigned when, int posn) {
-	char	dmsg[10];
-	dmsg[0] = PACK(0x1b,'[','j','S');
-	dmsg[1] = PACK('e','t',' ','s');
-	dmsg[2] = PACK('u','n','r','i');
-	dmsg[3] = PACK('s','e',':','\0');
-	entered_menu_str(&dmsg[4], when, posn);
-	write(FILENO_STDOUT, dmsg, 8);
+	char	dmsg[64];
+	strcpy(dmsg, dawnmenu);
+	entered_menu_str(&dmsg[16], when, posn);
+	write(FILENO_STDOUT, dmsg, strlen(dmsg));
 }
 
+const char	duskmenu[] = "\e[;Set sunset: ";
 void	show_dusk_menu(unsigned when, int posn) {
-	char	dmsg[10];
-	dmsg[0] = PACK(0x1b,'[','j','S');
-	dmsg[1] = PACK('e','t',' ','s');
-	dmsg[2] = PACK('u','n','s','e');
-	dmsg[3] = PACK('t',':','\0','\0');
-	entered_menu_str(&dmsg[4], when, posn);
-	write(FILENO_STDOUT, dmsg, 8);
+	char	dmsg[64];
+	entered_menu_str(&dmsg[15], when, posn);
+	write(FILENO_STDOUT, dmsg, strlen(dmsg));
 }
 
 int	menu_readkey(void) {
@@ -515,7 +518,7 @@ void	time_menu(void) {
 					else
 						return;
 				}
-			}
+			} txstr("Clk: "); txhex(newclock);
 		} while(0==(event&INT_KEYPAD));
 	}
 
@@ -605,23 +608,12 @@ void	dusk_menu(void) {
 	} dusk = newdusk;
 }
 
+const char	unknownstr[] = "\e[jUnknown Cmd Key\e[1;0HA/Tm B/Dwn C/Dsk";
 void	unknown_menu(void) {
 	//	0123456789ABCDEF
 	//	Unknown Cmd Key
 	//	A/Tm B/Dwn C/Dsk
-	char	dmsg[11];
-	dmsg[0] = PACK(0x1b,'[','j','U');
-	dmsg[1] = PACK('n','k','n','o');
-	dmsg[2] = PACK('w','n',' ','C');
-	dmsg[3] = PACK('m','d',' ','K');
-	dmsg[4] = PACK('e','y','\0','\0');
-	dmsg[5] = PACK(0x1b,'[','1',';');
-	dmsg[6] = PACK('0','H','A','/');
-	dmsg[7] = PACK('T','m',' ','B');
-	dmsg[8] = PACK('/','D','w','n');
-	dmsg[9] = PACK(' ','C','/','D');
-	dmsg[10] = PACK('s','k',0,0);
-	write(FILENO_STDOUT, dmsg, 11);
+	write(FILENO_STDOUT, unknownstr, strlen(unknownstr));
 }
 void	menu_task(void) {
 	// Controls LED 0x08
@@ -631,9 +623,7 @@ void	menu_task(void) {
 	// write(KFD_STDOUT, disp_build_gtlogo, sizeof(disp_build_gtlogo));
 	// write(KFD_STDOUT, disp_reset_data, sizeof(disp_reset_data));
 	// write(KFD_STDOUT, disp_gtech_data, sizeof(disp_gtech_data));
-	// IOSPACE	*sys = (IOSPACE *)IOADDR;
 	unsigned belltime = 0, when;
-
 
 	when = (volatile unsigned)rtcclock;
 	while(1) {
@@ -672,3 +662,14 @@ void	menu_task(void) {
 }
 #endif
 
+
+#ifdef	HELLO_TASK
+static const char *hello_string = "Hello, World!\r\n";
+void	hello_task(void) {
+	while(1) {
+		for(int i=0; i<15; i++)
+			wait(SWINT_CLOCK, -1);
+		write(FILENO_STDOUT, hello_string, strlen(hello_string));
+	}
+}
+#endif
