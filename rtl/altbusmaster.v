@@ -4,7 +4,11 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	
+// Purpose:	Because the S6 is *so* small logic-wise, the logic of setting up
+//		a project/design was separated from the logic of the design
+//	itself.  Hence, this is the "setup" design.  It allows us to test various
+//	components from the command line interface, as well as erasing and 
+//	programming the flash in order to set up the actual device interface.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -35,13 +39,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-//
 `include "builddate.v"
 //
 // `define	IMPLEMENT_ONCHIP_RAM
 `define	FLASH_ACCESS
 // `define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
-`define	COMPRESSED_SCOPE
+// `define	COMPRESSED_SCOPE
 `define	WBUBUS
 module	altbusmaster(i_clk, i_rst,
 		// DEPP I/O Control
@@ -65,7 +68,7 @@ module	altbusmaster(i_clk, i_rst,
 	// 2^14 bytes requires a LGMEMSZ of 14, and 12 address bits ranging from
 	// 0 to 11.  As with many other devices, the wb_cyc line is more for
 	// form than anything else--it is ignored by the memory itself.
-	localparam	LGMEMSZ=14;
+	localparam	LGMEMSZ=14;	// Takes 8 BLKRAM16 elements for LGMEMSZ=14
 	// As with the memory size, the flash size is also measured in log_2 of
 	// the number of bytes.
 	localparam	LGFLASHSZ = 24;
@@ -110,12 +113,6 @@ module	altbusmaster(i_clk, i_rst,
 	wire		wb_cyc, wb_stb, wb_we, wb_stall, wb_ack, wb_err;
 	wire	[31:0]	wb_data, wb_idata, w_wbu_addr;
 	wire	[(BAW-1):0]	wb_addr;
-	wire	[3:0]		io_addr;
-	assign	io_addr = {
-			wb_addr[(LGFLASHSZ-2)],	// Flash
-			wb_addr[(LGMEMSZ-2)],	// RAM
-			wb_addr[ 9],		// SCOPE
-			wb_addr[ 8] };		// I/O
 
 	// Wires going to devices
 	// And then headed back home
@@ -172,8 +169,10 @@ module	altbusmaster(i_clk, i_rst,
 	assign	wb_addr = w_wbu_addr[(BAW-1):0];
 
 
-	wire	io_sel, flash_sel, flctl_sel, scop_sel, mem_sel,
-			none_sel, many_sel;
+	// Signals to build/detect bus errors
+	wire	none_sel, many_sel;
+
+	wire	io_sel, flash_sel, flctl_sel, scop_sel, mem_sel;
 	wire	flash_ack, scop_ack, cfg_ack, mem_ack, many_ack;
 	wire	io_stall, flash_stall, scop_stall, cfg_stall, mem_stall;
 	reg	io_ack;
@@ -182,45 +181,213 @@ module	altbusmaster(i_clk, i_rst,
 			spio_data, gpio_data, uart_data;
 	reg	[31:0]	io_data;
 	reg	[(BAW-1):0]	bus_err_addr;
+	//
+	// wb_ack
+	//
+	// The returning wishbone ack is equal to the OR of every component that
+	// might possibly produce an acknowledgement, gated by the CYC line.  To
+	// add new components, OR their acknowledgements in here.
+	//
+	// Note the reference to none_sel.  If nothing is selected, the result
+	// is an error.  Here, we do nothing more than insure that the erroneous
+	// request produces an ACK ... if it was ever made, rather than stalling
+	// the bus.
+	//
+
 
 	assign	wb_ack = (wb_cyc)&&((io_ack)||(scop_ack)
 				||(mem_ack)||(flash_ack)||((none_sel)&&(1'b1)));
+
+	//
+	// wb_stall
+	//
+	// The returning wishbone stall line really depends upon what device
+	// is requested.  Thus, if a particular device is selected, we return
+	// the stall line for that device.
+	//
+	// To add a new device, simply and that devices select and stall lines
+	// together, and OR the result with the massive OR logic below.
+	//
 	assign	wb_stall = ((io_sel)&&(io_stall))
 			||((scop_sel)&&(scop_stall))
 			||((mem_sel)&&(mem_stall))
 			||((flash_sel||flctl_sel)&&(flash_stall));
 			// (none_sel)&&(1'b0)
 
+	//
+	// wb_idata
+	//
+	// This is the data returned on the bus.  Here, we select between a
+	// series of bus sources to select what data to return.  The basic
+	// logic is simply this: the data we return is the data for which the
+	// ACK line is high.
+	//
+	// The last item on the list is chosen by default if no other ACK's are
+	// true.  Although we might choose to return zeros in that case, by
+	// returning something we can skimp a touch on the logic.
+	//
+	// To add another device, add another ack check, and another closing
+	// parenthesis.
+	//
 	assign	wb_idata =  (io_ack|scop_ack)?((io_ack )? io_data  : scop_data)
 			: ((mem_ack)?(mem_data)
 			: flash_data);
+
+	//
+	// wb_err
+	//
+	// This is the bus error signal.  It should never be true, but practice
+	// teaches us otherwise.  Here, we allow for three basic errors:
+	//
+	// 1. STB is true, but no devices are selected
+	//
+	//	This is the null pointer reference bug.  If you try to access
+	//	something on the bus, at an address with no mapping, the bus
+	//	should produce an error--such as if you try to access something
+	//	at zero.
+	//
+	// 2. STB is true, and more than one device is selected
+	//
+	//	(This can be turned off, if you design this file well.  For
+	//	this line to be true means you have a design flaw.)
+	//
+	// 3. If more than one ACK is every true at any given time.
+	//
+	//	This is a bug of bus usage, combined with a subtle flaw in the
+	//	WB pipeline definition.  You can issue bus requests, one per
+	//	clock, and if you cross device boundaries with your requests,
+	//	you may have things come back out of order (not detected here)
+	//	or colliding on return (detected here).  The solution to this
+	//	problem is to make certain that any burst request does not cross
+	//	device boundaries.  This is a requirement of whoever (or
+	//	whatever) drives the bus.
+	//
 	assign	wb_err = ((wb_stb)&&(none_sel || many_sel)) || many_ack;
 
 	// Addresses ...
-	//	0000 xxxx	configuration/control registers
-	//	1 xxxx xxxx xxxx xxxx xxxx	Up-sampler taps
-	assign	io_sel   =((wb_cyc)&&(io_addr[3:0]==4'h1));
-	assign	scop_sel =((wb_cyc)&&(io_addr[3:0]==4'h2));
-	assign	flctl_sel=((wb_cyc)&&(io_addr[3:0]==4'h3));
-	assign	mem_sel  =((wb_cyc)&&(io_addr[3:2]==2'h1));
-	assign	flash_sel=((wb_cyc)&&(io_addr[3]));
+	//
+	// dev_sel
+	//
+	// The device select lines
+	//
+	//
 
-	assign	many_ack = 1'b0;
+
+	//
+	// The skipaddr bitfield below is our cheaters way of handling
+	// device selection.  We grab particular wires from the bus to do
+	// this, and ignore all others.  While this may lead to some
+	// surprising results for the CPU when it tries to access an
+	// inappropriate address, it also minimizes our logic while also
+	// placing every address at the right address.  The only problem is
+	// ... devices will also be at some unexpected addresses, but ... this
+	// is still within our spec.
+	//
+	wire	[3:0]	skipaddr;
+	assign	skipaddr = {
+			wb_addr[(LGFLASHSZ-2)],	// Flash
+			wb_addr[(LGMEMSZ-2)],	// RAM
+			wb_addr[ 9],		// SCOPE
+			wb_addr[ 8] };		// I/O
+	//
+	// This might not be the most efficient way in hardware, but it will
+	// work for our purposes here.  There are two phantom bits for each
+	// of these ... bits that tell the CPU which byte within the word, and
+	// another phantom bit because we allocated a minimum of two words to
+	// every device.
+	//
+	wire	idle_n;
+`ifdef	ZERO_ON_IDLE
+	assign idle_n = wb_stb;
+`else
+	assign idle_n = 1'b1;
+`endif
+
+// `define ZERO_ON_IDLE
+`ifdef	ZERO_ON_IDLE
+	assign	idle_n = (wb_cyc)&&(wb_stb);
+`else
+	assign	idle_n = 1'b1;
+`endif
+	assign	io_sel   =((idle_n)&&(skipaddr[3:0]==4'h1));
+	assign	scop_sel =((idle_n)&&(skipaddr[3:1]==3'h1)); // = 4'h2
+	assign	flctl_sel= 1'b0; // ((wb_cyc)&&(skipaddr[3:0]==4'h3));
+	assign	mem_sel  =((idle_n)&&(skipaddr[3:2]==2'h1));
+	assign	flash_sel=((idle_n)&&(skipaddr[3]));
+
+	//
+	// none_sel
+	//
+	// This wire is true if wb_stb is true and no device is selected.  This
+	// is an error condition, but here we present the logic to test for it.
+	//
+	//
+	// If you add another device, add another OR into the select lines
+	// associated with this term.
+	//
+	assign	none_sel =((wb_stb)&&(skipaddr==4'h0));
+
+	//
+	// many_sel
+	//
+	// This should *never* be true .... unless you mess up your address
+	// decoding logic.  Since I've done that before, I test/check for it
+	// here.
+	//
+	// To add a new device here, simply add it to the list.  Make certain
+	// that the width of the add, however, is greater than the number
+	// of devices below.  Hence, for 3 devices, you will need an add
+	// at least 3 bits in width, for 7 devices you will need at least 4
+	// bits, etc.
+	//
+	// Because this add uses the {} operator, the individual components to
+	// it are by default unsigned ... just as we would like.
+	//
+	// There's probably another easier/better/faster/cheaper way to do this,
+	// but I haven't found any such that are also easier to adjust with
+	// new devices.  I'm open to options.
+	//
 	assign	many_sel = 1'b0;
-	assign	none_sel =((wb_stb)&&(io_addr==4'h0));
+
+	//
+	// many_ack
+	//
+	// Normally this would capture the error when multiple things creates acks
+	// at the same time.  The S6 is small, though, and doesn't have the logic
+	// we need to do this right.  Hence we just declare (and hope) that this
+	// will never be true and work with that.
+	//
+	assign	many_ack = 1'b0;
 
 	wire		flash_interrupt, scop_interrupt, tmra_int, tmrb_int,
 			gpio_int, pwm_int, keypad_int,button_int;
 
 
 	//
+	// bus_err_addr
 	//
+	// We'd like to know, after the fact, what (if any) address caused a
+	// bus error.  So ... if we get a bus error, let's record the address
+	// on the bus for later analysis.
 	//
+	initial	bus_err_addr = 0;
+	always @(posedge i_clk)
+		if (wb_err)
+			bus_err_addr <= wb_addr;
+	//
+	// Interrupt processing
+	//
+	// The interrupt controller will be used to tell us if any interrupts
+	// take place.  
+	//
+	// To add more interrupts, you can just add more wires to this int_vector
+	// for the new interrupts.
+	// 
 	reg		rx_rdy;
 	wire	[11:0]	int_vector;
 	assign	int_vector = { 
 				flash_interrupt, gpio_int, pwm_int, keypad_int,
-				(~o_tx_stb), rx_rdy,
+				(!o_tx_stb), rx_rdy,
 				tmrb_int, tmra_int,
 				1'b0, scop_interrupt,
 				wb_err, button_int };
@@ -229,11 +396,6 @@ module	altbusmaster(i_clk, i_rst,
 	icontrol #(12)	pic(i_clk, 1'b0, (wb_stb)&&(io_sel)
 					&&(wb_addr[3:0]==4'h0)&&(wb_we),
 			wb_data, pic_data, int_vector, w_interrupt);
-
-	initial	bus_err_addr = 0; // `DATESTAMP;
-	always @(posedge i_clk)
-		if (wb_err)
-			bus_err_addr <= wb_addr;
 
 	wire	[31:0]	timer_data, timer_b;
 	wire		zta_ack, zta_stall, ztb_ack, ztb_stall;
@@ -251,7 +413,7 @@ module	altbusmaster(i_clk, i_rst,
 	always @(posedge i_clk)
 		case(wb_addr[3:0])
 			4'h0: io_data <= pic_data;
-			4'h1: io_data <= { {(32-BAW){1'b0}}, bus_err_addr };
+			4'h1: io_data <= { {(30-BAW){1'b0}}, bus_err_addr, 2'b00 };
 			4'h2: io_data <= timer_data;
 			4'h3: io_data <= timer_b;
 			4'h4: io_data <= pwm_data;
@@ -278,8 +440,9 @@ module	altbusmaster(i_clk, i_rst,
 	// Special Purpose I/O: Keypad, button, LED status and control
 	//
 	wire	[3:0]	w_led;
-	spio	thespio(i_clk, wb_cyc,(wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h5),wb_we,
-			wb_data, spio_data, o_kp_col, i_kp_row, i_btn, w_led,
+	spio	thespio(i_clk, wb_cyc,(wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h5),
+				wb_we, wb_data, spio_data,
+			o_kp_col, i_kp_row, i_btn, w_led,
 			keypad_int, button_int);
 	assign	o_led = { w_led[3]|w_interrupt,w_led[2],w_led[1:0] };
 
@@ -342,18 +505,27 @@ module	altbusmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
-	wbqspiflashp #(LGFLASHSZ)	flashmem(i_clk,
-		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),
-			wb_we, wb_addr[(LGFLASHSZ-3):0], wb_data,
-			flash_ack, flash_stall, flash_data,
-			o_qspi_sck, o_qspi_cs_n, o_qspi_mod,
-				o_qspi_dat, i_qspi_dat,
-			flash_interrupt);
+	wbqspiflash #(LGFLASHSZ)	flashmem(i_clk,
+		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
+			wb_addr[(LGFLASHSZ-3):0], wb_data,
+		flash_ack, flash_stall, flash_data,
+		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat,
+		flash_interrupt);
 `else
-	assign o_qspi_sck  = 1'b0;
-	assign o_qspi_cs_n = 1'b0;
-	assign o_qspi_mod  = 2'b0;
-	assign o_qspi_dat  = 4'b0;
+	reg	r_flash_ack;
+	initial	r_flash_ack = 1'b0;
+	always @(posedge i_clk)
+		r_flash_ack <= (wb_stb)&&((flash_sel)||(flctl_sel));
+
+	assign	flash_ack = r_flash_ack;
+	assign	flash_stall = 1'b0;
+	assign	flash_data = 32'h0000;
+	assign	flash_interrupt = 1'b0;
+
+	assign	o_qspi_sck   = 1'b1;
+	assign	o_qspi_cs_n  = 1'b1;
+	assign	o_qspi_mod   = 2'b01;
+	assign	o_qspi_dat   = 4'b1111;
 `endif
 
 	//

@@ -66,7 +66,7 @@ module	busmaster(i_clk, i_rst,
 	// 2^14 bytes requires a LGMEMSZ of 14, and 12 address bits ranging from
 	// 0 to 11.  As with many other devices, the wb_cyc line is more for
 	// form than anything else--it is ignored by the memory itself.
-	localparam	LGMEMSZ=14;	// Takes 8 BLKRAM16 elements for 14
+	localparam	LGMEMSZ=14;	// Takes 8 BLKRAM16 elements for LGMEMSZ=14
 	// As with the memory size, the flash size is also measured in log_2 of
 	// the number of bytes.
 	localparam	LGFLASHSZ = 24;
@@ -363,6 +363,7 @@ module	busmaster(i_clk, i_rst,
 	// bus error.  So ... if we get a bus error, let's record the address
 	// on the bus for later analysis.
 	//
+	initial	bus_err_addr = 0;
 	always @(posedge i_clk)
 		if (wb_err)
 			bus_err_addr <= wb_addr;
@@ -388,9 +389,6 @@ module	busmaster(i_clk, i_rst,
 	icontrol #(11)	pic(i_clk, 1'b0, (wb_stb)&&(io_sel)
 					&&(wb_addr[3:0]==4'h0)&&(wb_we),
 			wb_data, pic_data, int_vector, w_interrupt);
-
-	initial	bus_err_addr = 0; // `DATESTAMP;
-
 
 	wire	[31:0]	timer_data, watchdog_data;
 	wire		zta_ack, zta_stall, ztb_ack, ztb_stall;
