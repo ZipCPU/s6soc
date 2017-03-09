@@ -52,8 +52,16 @@ asm("\t.section\t.start\n"
 "\t.global\t_start\n"
 "\t.type\t_start,@function\n"
 "_start:\n"
-"LDI\t_top_of_stack,SP\n"
-"\tBRA\tentry\n"
+"\tNDUMP\n"
+"\tMOV\tkernel_exit(PC),uPC\n"
+"\tLDI\t255,R0\n"
+"\tSW\tR0,0x414\n"
+"\tLDI\t_top_of_stack,SP\n"
+"\tJSR\tentry\n"
+"NEXIT\tR0\n"
+"kernel_exit:\n"
+"\tHALT\n"
+"\tBRA\tkernel_exit\n"
 "\t.section\t.text");
 
 #endif
