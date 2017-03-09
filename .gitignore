@@ -1,6 +1,7 @@
 xilinx/
 obj_dir/
 obj-pc/
+obj-zip/
 *.swp
 tags
 zip_sim
