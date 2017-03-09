@@ -1,10 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	kptest.c
+// Filename:	txfns.c
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	To test and demonstrate that the keypad works.
+// Purpose:
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -35,44 +35,53 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "asmstartup.h"
 #include "board.h"
-#include "keypad.h"
 #include "txfns.h"
 
-void entry(void) {
-	register volatile IOSPACE *const sys = _sys;
+void	txchr(char ch);
+void	txval(int val);
+void	txstr(const char *str);
 
-	sys->io_pic = 0x07fffffff; // Acknowledge and turn off all interrupts
-	sys->io_spio = 0x0f0;
-	sys->io_timer = 100000 | TM_REPEAT;
+void	txchr(char val) {
+	volatile IOSPACE *const sys = _sys;
+	unsigned v = (unsigned char)val;
 
-	txstr("Press any keypad button for test.\r\n");
+	// To read whether or not the transmitter is ready, you must first
+	// clear the interrupt bit.
+	sys->io_pic = INT_UARTTX;
+	// If the interrupt bit sets itself again immediately, the transmitter
+	// is ready.  Otherwise, wait until the transmitter becomes ready.
+	while((sys->io_pic&INT_UARTTX)==0)
+		;
+	sys->io_uart = (v&0x0ff);
+	// Give the transmitter a chance to finish, and then to create an
+	// interrupt when done
+	sys->io_pic = INT_UARTTX;
+}
 
-	while(1) {
-		int	ch;
-		while(0 == (sys->io_pic & INT_KEYPAD))
-			;
-		sys->io_pic = INT_KEYPAD | INT_TIMER;
-		// Wait 5 ms
-		for(int i=0; i<5; i++) {
-			while(0 == (sys->io_pic & INT_TIMER))
-				;
-		}
-		sys->io_spio = 0x011;
-		ch = keypadread();
-		if ((ch < 0)||(ch == -1))
-			; // txstr("Unknown key pressed or error\n");
-		else if (ch < 10)
-			txchr(ch+'0');
-		else if (ch == 15)
-			txstr("F\r\n");
-		else if (ch < 15)
-			txchr(ch+'A'-10);
-		else {
-			txstr("Unknown key pressed\r\n");
-		}
-		keypad_wait_for_release();
-		sys->io_spio = 0x010;
+void    txstr(const char *str) {
+	const	char *ptr = str;
+	while(*ptr)
+		txchr(*ptr++);
+}
+
+void	txval(int val) {
+	txstr("\r\n0x");
+	for(int i=28; i>=0; i-=4) {
+		int ch = ((val>>i)&0x0f)+'0';
+		if (ch > '9')
+			ch = ch - '0'+'A'-10;
+		txchr(ch);
 	}
 }
+
+void	txhex(int val) {
+	for(int i=28; i>=0; i-=4) {
+		int ch = ((val>>i)&0x0f)+'0';
+		if (ch > '9')
+			ch = ch - '0'+'A'-10;
+		txchr(ch);
+	}
+	txstr("\r\n");
+}
+

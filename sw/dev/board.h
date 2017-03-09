@@ -59,9 +59,8 @@
 #define	INT_BUTTON	0x001
 #define	INT_BUSERR	0x002 // Kind of useless, a buserr will kill us anyway
 #define	INT_SCOPE	0x004
-#define	INT_RTC		0x008 // May not be available, due to lack of space
-#define	INT_TIMA	0x010
-#define	INT_TIMB	0x020
+#define	INT_TIMER	0x010
+//#define INT_WATCHDOG	0x020	// Catching a watchdog/reset interrupt makes no sense
 #define	INT_UARTRX	0x040
 #define	INT_UARTTX	0x080
 #define	INT_KEYPAD	0x100
@@ -69,50 +68,54 @@
 #define	INT_GPIO	0x400
 // #define	INT_FLASH	0x800	// Not available due to lack of space
 #define	INT_ENABLEV(IN)		(INT_ENABLE|((IN)<<16))
-#define	INT_DISABLEV(IN)	(INT_ENABLE|((IN)<<16))
+#define	INT_DISABLEV(IN)	((IN)<<16)
 #define	INT_CLEAR(IN)		(IN)
+#define	INT_CLEARPIC	0x7fff7fff
+#define	INT_DALLPIC	0x7fff0000
 
 // Clocks per second, for use with the timer
 #define	TM_ONE_SECOND	80000000
 #define	TM_REPEAT	0x80000000
 
 typedef	struct	{
-	volatile int		io_pic;
-	volatile unsigned	*io_buserr;
-	volatile int		io_tima, io_timb;
-	volatile unsigned	io_pwm_audio;
-	volatile unsigned	io_spio; // aka keypad, buttons, and keyboard
-	volatile unsigned	io_gpio;
-	volatile unsigned	io_uart;
-	volatile unsigned	io_version;
+	int		io_pic;
+	unsigned	*io_buserr;
+	int		io_timer, io_watchdog;
+	unsigned	io_pwm_audio;
+	unsigned	io_spio; // aka keypad, buttons, and keyboard
+	unsigned	io_gpio;
+	unsigned	io_uart;
+	unsigned	io_version;
 } IOSPACE;
 
-typedef	struct {
-	volatile unsigned	s_control, s_data;
-} SCOPE;
 
-typedef	struct	{
-	volatile unsigned	f_crc, f_far_maj, f_far_min, f_fdri,
-			f_fdro, f_cmd, f_ctl, f_mask,
-			f_stat, f_lout, f_cor1, f_cor2,
-			f_pwrdn, f_flr, f_idcode, f_cwdt,
-			f_hcopt, f_csbo, f_gen1, f_gen2,
-			f_gen3, f_gen4, f_gen5, f_mode,
-			f_gwe, f_mfwr, f_cclk, f_seu, f_exp, f_rdbk,
-			f_bootsts, f_eye, f_cbc;
-} FPGACONFIG;
+#define	WBSCOPE_NO_RESET	0x80000000
+#define	WBSCOPE_MANUAL	WBSCOPE_TRIGGER
+//
+#define	WBSCOPE_STOPPED		0x40000000
+#define	WBSCOPE_TRIGGERED	0x20000000
+#define	WBSCOPE_PRIMED		0x10000000
+#define	WBSCOPE_TRIGGER	       (0x08000000|WBSCOPE_NO_RESET)
+#define	WBSCOPE_DISABLED	0x04000000
+#define	WBSCOPE_DISABLE		0x04000000	// Disable the scope trigger
+#define	WBSCOPE_RZERO		0x02000000	// Unused,true if ptd at begning
+#define	WBSCOPE_LGLEN(A)	((A>>20)&0x01f)
+#define	WBSCOPE_LENGTH(A)	(1<<(WBSCOPE_LGLEN(A)))
 
-typedef	struct	{
-	volatile unsigned	c_clock, c_timer, c_stopwatch, c_alarm;
-} RTCCLOCK;
+typedef	struct WBSCOPE_S {
+	unsigned	s_ctrl, s_data;
+} WBSCOPE;
 
-#define	IOADDR		0x000100
-#define	SCOPEADDR	0x000200
-// #define FCTLADDR	0x000300 // Flash control, depends upon write capability
-#define	CONFIGADDR	0x000400
-// #define RTCADDR	0x000800 // Disabled for lack of space on device
-#define	RAMADDR		0x002000
-#define	FLASHADDR	0x400000
-#define	RESET_ADDR	0x480000
+#define	IOADDR		0x000400
+#define	SCOPEADDR	0x000800
+// #define FCTLADDR	0x000c00 // Flash control, depends upon write capability
+#define	RAMADDR		0x004000
+#define	RAMSZ		(RAMADDR)
+#define	FLASHADDR	0x1000000
+#define	RESET_ADDR	0x1200000
+#define	FLASHSZ		(FLASHADDR)
+
+static	volatile IOSPACE *const _sys   = (IOSPACE *)IOADDR;
+static	volatile WBSCOPE *const _scope = (WBSCOPE *)SCOPEADDR;
 
 #endif

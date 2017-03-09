@@ -44,9 +44,9 @@
 const char	msg[] = "Doorbell!\r\n\r\n";
 
 void entry(void) {
-	register IOSPACE	*sys = (IOSPACE *)0x0100;
+	register volatile IOSPACE *const sys = _sys;
 
-	sys->io_timb = 0;
+	sys->io_watchdog = 0;
 	sys->io_pic = 0x07fffffff; // Acknowledge and turn off all interrupts
 
 	sys->io_spio = 0x0f4;
@@ -55,7 +55,7 @@ void entry(void) {
 		int	seconds = 0, pic;
 		const unsigned short	*ptr;
 		const char	*mptr = msg;
-		sys->io_tima = TM_ONE_SECOND | TM_REPEAT; // Ticks per second, 80M
+		sys->io_timer = TM_ONE_SECOND | TM_REPEAT; // Ticks per second, 80M
 
 		sys->io_spio = 0x0f0;
 		ptr = (const unsigned short *)sound_data;
@@ -66,7 +66,7 @@ void entry(void) {
 			sys->io_spio = 0x022;
 			do {
 				pic = sys->io_pic;
-				if (pic & INT_TIMA)
+				if (pic & INT_TIMER)
 					seconds++;
 				if ((pic & INT_UARTTX)&&(*mptr))
 					sys->io_uart = *mptr++;
@@ -84,7 +84,7 @@ void entry(void) {
 		sys->io_pwm_audio = 0;
 		while(seconds < 10) {
 			pic = sys->io_pic;
-			if (pic & INT_TIMA)
+			if (pic & INT_TIMER)
 				seconds++;
 			sys->io_pic = (pic & 0x07fff);
 		}

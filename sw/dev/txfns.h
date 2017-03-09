@@ -1,10 +1,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	kptest.c
+// Filename:	txfns.h
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	To test and demonstrate that the keypad works.
+// Purpose:
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -35,44 +35,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "asmstartup.h"
-#include "board.h"
-#include "keypad.h"
-#include "txfns.h"
+#ifndef	TXFNS_H
+#define	TXFNS_H
 
-void entry(void) {
-	register volatile IOSPACE *const sys = _sys;
+extern	void	txchr(char ch);
+extern	void	txval(int val);
+extern	void	txhex(int val);
+extern	void	txstr(const char *str);
 
-	sys->io_pic = 0x07fffffff; // Acknowledge and turn off all interrupts
-	sys->io_spio = 0x0f0;
-	sys->io_timer = 100000 | TM_REPEAT;
-
-	txstr("Press any keypad button for test.\r\n");
-
-	while(1) {
-		int	ch;
-		while(0 == (sys->io_pic & INT_KEYPAD))
-			;
-		sys->io_pic = INT_KEYPAD | INT_TIMER;
-		// Wait 5 ms
-		for(int i=0; i<5; i++) {
-			while(0 == (sys->io_pic & INT_TIMER))
-				;
-		}
-		sys->io_spio = 0x011;
-		ch = keypadread();
-		if ((ch < 0)||(ch == -1))
-			; // txstr("Unknown key pressed or error\n");
-		else if (ch < 10)
-			txchr(ch+'0');
-		else if (ch == 15)
-			txstr("F\r\n");
-		else if (ch < 15)
-			txchr(ch+'A'-10);
-		else {
-			txstr("Unknown key pressed\r\n");
-		}
-		keypad_wait_for_release();
-		sys->io_spio = 0x010;
-	}
-}
+#endif

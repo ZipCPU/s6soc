@@ -4,8 +4,9 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	A modification to the original doorbell.c program.
-//		seconds.  Listening to that test is ... getting old.
+// Purpose:	A modification to the original doorbell.c program that played
+//		a doorbell sound every ten seconds.  Listening to that test is
+//	... getting old.
 //
 //	Let's let this one do the following:
 //		1. Display the time on the display (it will be impossible to
@@ -53,6 +54,8 @@
 #include "board.h"
 #include "rtcsim.h"
 #include "display.h"
+#include "string.h"
+#include "txfns.h"
 
 #include "samples.c"
 
@@ -61,13 +64,30 @@ void	zip_halt(void);
 void	build_dpymsg(char *msg, unsigned clkval);
 void	build_uartmsg(char *msg, unsigned clkval);
 void	showval(int val);
-void	txval(int val);
+
+#define	CLEAR_WATCHDOG	_sys->io_watchdog = 0
+#define	TOUCH_WATCHDOG	_sys->io_watchdog = 500000
 
 void entry(void) {
-	register IOSPACE	*sys = (IOSPACE *)0x0100;
+	register volatile IOSPACE *const sys = _sys;
 	char	dpymsg[64], *dpyptr;
 	char	uartmsg[160], *uartptr;
 	int	newmsgtime = 0, leastmsgtime = -1, lstmsgtime = 0;
+
+	CLEAR_WATCHDOG;
+
+	txstr("\r\nREBOOT!\r\n");
+	txstr("Scope Control = "); txval(_scope->s_ctrl);
+	if (_scope->s_ctrl & WBSCOPE_STOPPED) {
+		int	ln = WBSCOPE_LENGTH(_scope->s_ctrl);
+		for(int i=0; i<ln; i++)
+			txval(_scope->s_data);
+		txval((int)_sys->io_buserr);
+		txstr("\r\n\r\nEndScope\r\n");
+	} else {
+		txstr("\r\n");
+		_scope->s_ctrl = 20;
+	}
 
 	dpymsg[0] = 0;
 	dpyptr = dpymsg;
@@ -76,11 +96,11 @@ void entry(void) {
 	build_uartmsg(uartmsg, 0);
 	uartptr = uartmsg;
 
-	sys->io_timb = 0;
-	sys->io_pic = 0x07fffffff; // Acknowledge and turn off all interrupts
+	sys->io_watchdog = 0;
+	sys->io_pic = INT_CLEARPIC; // Acknowledge and turn off all interrupts
 
 	sys->io_spio = 0x0f4;
-	newmsgtime = sys->io_tima;
+	newmsgtime = sys->io_timer;
 	leastmsgtime = -1;
 	lstmsgtime = newmsgtime;
 	while(1) {
@@ -94,16 +114,14 @@ void entry(void) {
 		sys->io_pwm_audio = 0x0018000;
 
 		// Set for one ticks per second, 80M clocks per tick
-		sys->io_tima = TM_ONE_SECOND | TM_REPEAT;
+		sys->io_timer = TM_ONE_SECOND | TM_REPEAT;
 
 		// We start by waiting for a doorbell
 		while(((pic=sys->io_pic) & INT_BUTTON)==0) {
-			if (uartmsg[10] == 0) {
-				sys->io_spio = 0x0fe;
-				zip_halt();
-			}
-			if (pic & INT_TIMA) {// top of second
-				sys->io_pic = INT_TIMA;
+			TOUCH_WATCHDOG;
+
+			if (pic & INT_TIMER) {// top of second
+				sys->io_pic = INT_TIMER;
 				rtcclock = rtcnext(rtcclock);
 
 				// Turn all LED off (again)
@@ -118,53 +136,27 @@ void entry(void) {
 
 					// Turn one LED on--top of minute
 					sys->io_spio = 0x0f1;
-					newmsgtime = sys->io_tima;
+					newmsgtime = sys->io_timer;
 					lstmsgtime = -1;
 					leastmsgtime = -1;
 				}
 			}
-			/*
-			if (uartmsg[10] == 0) {
-				sys->io_spio = 0x0fc;
-				zip_halt();
-			}
-			*/
+
 			if (*uartptr) {
 				if (pic & INT_UARTTX) {
 					sys->io_uart = *uartptr++;
 					sys->io_spio = 0x22;
 					sys->io_pic = INT_UARTTX;
-					if (uartptr > &uartmsg[13]) {
-						sys->io_spio = 0x0fd;
-						zip_halt();
-					}
 
 					if (lstmsgtime != -1) {
 						int tmp;
-						tmp = (lstmsgtime-sys->io_tima);
+						tmp = (lstmsgtime-sys->io_timer);
 						if ((leastmsgtime<0)||(tmp<leastmsgtime))
 							leastmsgtime = tmp;
-					} lstmsgtime = sys->io_tima;
+					} lstmsgtime = sys->io_timer;
 				}
 			} else {
 				sys->io_spio = 0x20;
-				/*
-				if (newmsgtime != 0) {
-					int thistime = sys->io_tima;
-					thistime = newmsgtime - thistime;
-					showval(thistime);
-					txval(thistime);
-					txval(leastmsgtime);
-					txval(lstmsgtime);
-					zip_halt();
-					newmsgtime = 0;
-				}
-				for(int i=0; i<12; i++)
-					if (uartmsg[i] == 0) {
-						sys->io_spio = i+0xf0;
-						zip_halt();
-					}
-				*/
 			}
 			if (*dpyptr) {
 				// This will take a long time.  It should be an
@@ -174,9 +166,10 @@ void entry(void) {
 				sys->io_spio = 0x44;
 			} else {
 				sys->io_spio = 0x40;
-			} // sys->io_pic = (pic & (INT_TIMA|INT_UARTTX));
+			} // sys->io_pic = (pic & (INT_TIMER|INT_UARTTX));
 		}
 
+		TOUCH_WATCHDOG;
 		// DOORBELL!!!!!!
 		// Set the Display message
 		strcpy(dpymsg, "a[jDoorbell!");
@@ -193,11 +186,11 @@ void entry(void) {
 		sptr = sound_data;
 		sys->io_pwm_audio = 0x0310000; // Turn on the audio
 		while(sptr < &sound_data[NSAMPLE_WORDS]) {
-			unsigned	this_sample;
 			do {
+				TOUCH_WATCHDOG;
 				pic = sys->io_pic;
-				if (pic & INT_TIMA) {
-					sys->io_pic = INT_TIMA;
+				if (pic & INT_TIMER) {
+					sys->io_pic = INT_TIMER;
 					seconds++;
 					rtcclock = rtcnext(rtcclock);
 				} if ((pic & INT_UARTTX)&&(*uartptr)) {
@@ -211,24 +204,26 @@ void entry(void) {
 				// interruptable task ... but, sigh, we're not
 				// there yet.
 					dispchar(*dpyptr++);
-					sys->io_spio = 0x44;
+					sys->io_spio = 0x45;
 				} else
 					sys->io_spio = 0x40;
 			} while((pic & INT_AUDIO)==0);
-			this_sample = (*sptr++) & 0x0ffff;
-			sys->io_pwm_audio = this_sample;
+			sys->io_pwm_audio = (*sptr++) & 0x0ffff;
 			// Now, turn off the audio interrupt since it doesn't
 			// reset itself ...
 			sys->io_pic = INT_AUDIO;
 		} sys->io_pic = INT_BUTTON;
+		sys->io_spio = 0x10;
 
+		TOUCH_WATCHDOG;
 		// Now we wait for the end of our 30 second window
 		sys->io_spio = 0x0f8;
 		sys->io_pwm_audio = 0x018000; // Turn off the Audio device
 		while(seconds < 30) {
+			TOUCH_WATCHDOG;
 			pic = sys->io_pic;
-			if (pic & INT_TIMA) {
-				sys->io_pic = INT_TIMA;
+			if (pic & INT_TIMER) {
+				sys->io_pic = INT_TIMER;
 				seconds++;
 				rtcclock = rtcnext(rtcclock);
 			} if (pic & INT_BUTTON) {
@@ -236,6 +231,7 @@ void entry(void) {
 				seconds = 0;
 			}
 		} sys->io_pic = INT_BUTTON;
+		TOUCH_WATCHDOG;
 	}
 }
 
@@ -284,41 +280,3 @@ void	showval(int val) {
 		dispchar(ch);
 	}
 }
-
-void	txch(char val) {
-	register IOSPACE	*sys = (IOSPACE *)0x0100;
-	unsigned v = (unsigned char)val;
-
-	// To read whether or not the transmitter is ready, you must first
-	// clear the interrupt bit.
-	sys->io_pic = INT_UARTTX;
-	for(int i=0; i<5000; i++)
-		asm("noop");
-	sys->io_pic = INT_UARTTX;
-	// If the interrupt bit sets itself again immediately, the transmitter
-	// is ready.  Otherwise, wait until the transmitter becomes ready.
-	while((sys->io_pic&INT_UARTTX)==0)
-		;
-	sys->io_uart = (v&0x0ff);
-	// Give the transmitter a chance to finish, and then to create an
-	// interrupt when done
-	sys->io_pic = INT_UARTTX;
-}
-
-void	txval(int val) {
-	txch('\r');
-	txch('\n');
-	txch('0');
-	txch('x');
-	for(int i=28; i>=0; i-=4) {
-		int ch = ((val>>i)&0x0f)+'0';
-		if (ch > '9')
-			ch = ch - '0'+'A'-10;
-		txch(ch);
-	}
-}
-
-// PPONP16P
-// 00120O91
-// 00120NM3
-// 00120E91 = 1183377 ~= 91029 / char, at 0x208d 8333/baud, 83,330 per char

@@ -62,11 +62,10 @@ unsigned	rtcnext(unsigned now) {
 			}
 		}
 	}
-
 	return now;
 }
 
-static const int days_per_month[] = {
+static const char days_per_month[] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
@@ -74,7 +73,7 @@ unsigned	rtcdatenext(unsigned today) {
 	int dy, mo;
 
 	dy = (today&0x0f)+((today>>4)&0x03)*10;
-	mo = ((today>>8)&0x0f)+(today&0x0100)?10:0;
+	mo = ((today>>8)&0x0f)+((today&0x0100)?10:0);
 	dy = dy+1;
 	if ((mo>12)||(dy > days_per_month[mo-1])) {
 		if (mo == 2) {
@@ -122,7 +121,6 @@ unsigned	rtcdatenext(unsigned today) {
 		if ((today & 0x0f)>=0x0a)
 			today += 0x06;
 	}
-
 	return today;
 }
 
@@ -133,7 +131,7 @@ unsigned	rtcdatenext(unsigned today) {
 
 void rtctask(void) {
 	// IOSPACE *sys = (IOSPACE *)IOADDR;
-	rtcdate = 0x20160504;
+	rtcdate = 0x20170408;
 	rtcclock = 0;
 	while(1) {
 		unsigned event = wait(SWINT_CLOCK,-1);

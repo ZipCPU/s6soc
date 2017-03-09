@@ -52,17 +52,17 @@
 const char msg[] = "Hello, world!\r\n";
 
 void entry(void) {
-	register IOSPACE	*sys = (IOSPACE *)IOADDR;
+	volatile IOSPACE *const sys = (IOSPACE *)IOADDR;
 	int	ledset = 0;
 
 	sys->io_spio = 0x0f0;
 
 	/// Turn off timer B
-	sys->io_timb = 0;
+	sys->io_watchdog = 0;
 
 	while(1) {
 		const char	*ptr;
-		sys->io_tima = TM_ONE_SECOND; // Ticks per second, 80M
+		sys->io_timer = TM_ONE_SECOND; // Ticks per second, 80M
 		sys->io_pic  = 0x07fffffff; // Acknowledge and turn off all ints
 
 		ptr = msg;
@@ -77,7 +77,7 @@ void entry(void) {
 		}
 
 		// Now, wait for the top of the second
-		while((sys->io_pic & INT_TIMA)==0)
+		while((sys->io_pic & INT_TIMER)==0)
 			;
 
 		ledset <<= 1;

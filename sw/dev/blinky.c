@@ -1,10 +1,13 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	kptest.c
+// Filename:	blinky.c
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	To test and demonstrate that the keypad works.
+// Purpose:	To toggle/blink the LEDs in a fashion that will let us know
+//		1) that the CPU is running, 2) that the LEDs are working, and
+//	even better, 3) that the buttons are working.
+//
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -35,44 +38,59 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "asmstartup.h"
+// #include "asmstartup.h"
 #include "board.h"
-#include "keypad.h"
-#include "txfns.h"
+
+void	zip_idle(void);
+
+asm("\t.section\t.start\n"
+"\t.global\t_start\n"
+"\t.type\t_start,@function\n"
+"_start:\n"
+"\tMOV\tkernel_exit(PC),uPC\n"
+"\tLDI 104,R0\n"
+"\tSW R0,0x41c\n"
+"\tLDI 0xff,R0\n"
+"\tSW R0,0x414\n"
+"\tLDI\t_top_of_stack,SP\n"
+"\tJSR\tentry\n"
+"\tNEXIT\tR0\n"
+"kernel_exit:\n"
+"\tBUSY\n"
+"\t.section\t.text");
 
 void entry(void) {
-	register volatile IOSPACE *const sys = _sys;
+	const char	*msg = "Hello, World!\r\n", *ptr = msg;
+	int	count = 0;
 
-	sys->io_pic = 0x07fffffff; // Acknowledge and turn off all interrupts
-	sys->io_spio = 0x0f0;
-	sys->io_timer = 100000 | TM_REPEAT;
+	_sys->io_spio = 0x0fa;
+	_sys->io_timer = TM_REPEAT | (TM_ONE_SECOND/4);
+	_sys->io_pic = INT_ENABLEV(INT_TIMER)|INT_CLEAR(INT_TIMER);
 
-	txstr("Press any keypad button for test.\r\n");
+	do {
+		zip_idle();
+		int picv = _sys->io_pic;
+		if (picv & INT_TIMER) {
+			int ledv = _sys->io_spio;
+			ledv <<= 1;
+			ledv = ledv & 0x0f;
+			if (ledv == 0)
+				ledv = 1;
+			_sys->io_spio = ledv | 0x0f0;
 
-	while(1) {
-		int	ch;
-		while(0 == (sys->io_pic & INT_KEYPAD))
-			;
-		sys->io_pic = INT_KEYPAD | INT_TIMER;
-		// Wait 5 ms
-		for(int i=0; i<5; i++) {
-			while(0 == (sys->io_pic & INT_TIMER))
-				;
+			if (*ptr)
+				_sys->io_uart = (unsigned)*ptr++;
+			if (count++ > 4*60) {
+				count = 0;
+				ptr = msg;
+			}
 		}
-		sys->io_spio = 0x011;
-		ch = keypadread();
-		if ((ch < 0)||(ch == -1))
-			; // txstr("Unknown key pressed or error\n");
-		else if (ch < 10)
-			txchr(ch+'0');
-		else if (ch == 15)
-			txstr("F\r\n");
-		else if (ch < 15)
-			txchr(ch+'A'-10);
-		else {
-			txstr("Unknown key pressed\r\n");
-		}
-		keypad_wait_for_release();
-		sys->io_spio = 0x010;
-	}
+
+		_sys->io_pic = INT_ENABLEV(INT_TIMER)|INT_CLEAR(INT_TIMER);
+	} while(1);
 }
+
+// PPONP16P
+// 00120O91
+// 00120NM3
+// 00120E91 = 1183377 ~= 91029 / char, at 0x208d 8333/baud, 83,330 per char

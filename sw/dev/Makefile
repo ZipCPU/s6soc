@@ -46,7 +46,7 @@
 ##
 ##
 all:
-PROGRAMS := helloworld doorbell doorbell2 kptest
+PROGRAMS := helloworld doorbell doorbell2 kptest blinky
 all: $(OBJDIR)/ $(PROGRAMS)
 
 
@@ -60,46 +60,65 @@ OBJDUMP := $(CROSS)-objdump
 
 # Not for build, for for building tags and dependency files, we need to know
 # what the sources and headers are
-DEVDRVR:= keypad.c display.c rtcsim.c
+DEVDRVR:= keypad.c display.c rtcsim.c txfns.c
 SOURCES:= helloworld.c doorbell.c doorbell2.c kptest.c $(DEVDRVR)
 HEADERS:= board.h
-# OBJECTS:= $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
 OBJDRVR := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(DEVDRVR)))
 
-
 CPPFLAGS := -I../zipos -I.
-CFLAGS   := -O3 -Wall -Wextra -nostdlib -fno-builtin
+DUMPFLAGS := # -fdump-rtl-all
+CFLAGS   := $(CPPFLAGS) $(DUMPFLAGS) -O3 -Wall -Wextra -nostdlib -fno-builtin -Wa,-nocis
 LDFLAGS   = -T cmod.ld -Wl,-Map,$(OBJDIR)/$@.map -Wl,--unresolved-symbols=report-all -nostdlib
 
 $(OBJDIR)/:
-	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+	$(mk-objdir)
 
 %.o: $(OBJDIR)/%.o
 
 $(OBJDIR)/%.o: %.c
+	$(mk-objdir)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(OBJDIR)/%.o: ../zipos/%.c
+	$(mk-objdir)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.s: %.c
+	$(mk-objdir)
 	$(CC) -S $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.txt: $(OBJDIR)/%.o
+	$(mk-objdir)
 	$(OBJDUMP) -dr $^ > $@
+%.txt: %
+	$(OBJDUMP) -Dr $< > $@
 
 
-helloworld: $(OBJDIR)/ $(OBJDIR)/helloworld.o cmod.ld
+helloworld: $(OBJDIR)/helloworld.o cmod.ld
 	$(CC) $(LDFLAGS) $(OBJDIR)/helloworld.o -o $@
 $(OBJDIR)/helloworld.txt: helloworld
 	$(OBJDUMP) -dr $^ > $@
 
-doorbell2: $(OBJDIR)/ $(OBJDIR)/doorbell2.o $(OBJDRVR) cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/doorbell2.o $(OBJDRVR) -o $@
+doorbell: $(OBJDIR)/doorbell.o cmod.ld
+	$(CC) $(LDFLAGS) $(OBJDIR)/doorbell.o -o $@
+
+doorbell2: $(OBJDIR)/doorbell2.o $(OBJDRVR) $(OBJDIR)/string.o cmod.ld
+	$(CC) $(LDFLAGS) $(OBJDIR)/doorbell2.o $(OBJDRVR) $(OBJDIR)/string.o -o $@
 $(OBJDIR)/doorbell2.txt: doorbell2
 	$(OBJDUMP) -dr $^ > $@
 
-kptest: $(OBJDIR)/ $(OBJDIR)/kptest.o $(OBJDRVR) cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/kptest.o $(OBJDRVR) -o $@
+KPSRCS := kptest.c keypad.c txfns.c
+KPOBJS := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(KPSRCS)))
+kptest: $(KPOBJS) cmod.ld
+	$(CC) $(LDFLAGS) $(KPOBJS) -o $@
 $(OBJDIR)/kptest.txt: kptest
 	$(OBJDUMP) -dr $^ > $@
+
+blinky: $(OBJDIR)/blinky.o cmod.ld
+	$(CC) $(LDFLAGS) $(OBJDIR)/blinky.o -o $@
+
+define	mk-objdir
+	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+endef
 
 define	build-depends
 	@echo "Building dependency file(s)"
