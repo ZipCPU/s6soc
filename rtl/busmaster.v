@@ -373,8 +373,8 @@ module	busmaster(i_clk, i_rst,
 	// The interrupt controller will be used to tell us if any interrupts
 	// take place.  
 	//
-	// To add more interrupts, you can just add more wires to this int_vector
-	// for the new interrupts.
+	// To add more interrupts, you can just add more wires to this
+	// int_vector.
 	// 
 	reg		rx_rdy;
 	wire	[10:0]	int_vector;
