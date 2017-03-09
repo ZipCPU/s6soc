@@ -63,6 +63,5 @@ questions, or even suggestions.
 
 20170126: I'm in the process of updating the project to work with the newer version of the ZipCPU--the one that can handle the more traditional 8-bit bytes, rather than the 32-bit bytes the original ZipCPU could only handle.
 
-Once this update is complete, and proven working on my desktop, I'll merge this branch into the master, but until then it is just a work in progress.
-
+20170309: All of the prior ZipOS functionality now works (again) using the new ZipCPU.
 
