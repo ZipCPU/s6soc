@@ -518,7 +518,7 @@ void	time_menu(void) {
 					else
 						return;
 				}
-			} txstr("Clk: "); txhex(newclock);
+			}
 		} while(0==(event&INT_KEYPAD));
 	}
 
