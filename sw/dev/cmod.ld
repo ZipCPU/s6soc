@@ -34,19 +34,18 @@ ENTRY(_start)
 
 MEMORY
 {
-	blkram (wx) : ORIGIN = 0x002000, LENGTH = 0x001000
-	flash  (rx) : ORIGIN = 0x400000, LENGTH = 0x400000
+	blkram (wx) : ORIGIN = 0x0004000, LENGTH = 0x0004000
+	flash  (rx) : ORIGIN = 0x1000000, LENGTH = 0x1000000
 }
 
-_top_of_stack = ORIGIN(blkram) + LENGTH(blkram) - 1;
+_top_of_stack = ORIGIN(blkram) + LENGTH(blkram) - 4;
 
 SECTIONS
 {
-  . = 0x0480000;
-  .rocode 0x0480000 : { *(.start) *(.text)
-	*(.rodata)
-	*(.strings) } > flash
-  . = ORIGIN(blkram);
-  .data : { *(.fixdata) *(.data) *(COMMON) *(.bss) } > blkram
+  . = 0x1200000;
+  .rocode 0x1200000 : { *(.start) *(.text*)
+	*(.rodata*)
+	*(.strings*) } > flash
+  .data : { *(.fixdata*) *(.data*) *(COMMON*) *(.bss*) } > blkram
   _top_of_heap = .;
 }
