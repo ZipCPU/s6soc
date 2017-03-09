@@ -69,6 +69,9 @@ NET "io_qspi_dat<2>" LOC="N10"	| IOSTANDARD = LVCMOS33;
 NET "io_qspi_dat<3>" LOC="P10"	| IOSTANDARD = LVCMOS33;
 
 #DEPP Signals
+#   The "main" design doesnt have the room to support the logic necessary
+#   to drive these, so they stay safely commented here.
+
 NET "o_depp_wait"     LOC = "B6"  | IOSTANDARD = LVCMOS33;
 NET "i_depp_astb_n"   LOC = "A6"  | IOSTANDARD = LVCMOS33;
 NET "i_depp_dstb_n"   LOC = "B7"  | IOSTANDARD = LVCMOS33;
@@ -85,14 +88,14 @@ NET "io_depp_data<7>" LOC = "A12" | IOSTANDARD = LVCMOS33;
 #IO PORTs
 
 # UART: PIO26 (CTS), PIO27 (TXD), PIO28(RXD), PIO29(RTS)
-NET "i_uart"  LOC = "B3"  | IOSTANDARD = LVCMOS33;
-NET "o_uart"  LOC = "A2"  | IOSTANDARD = LVCMOS33;
-NET "i_uart_rts" LOC = "B1"  | IOSTANDARD = LVCMOS33;
-NET "o_uart_cts" LOC = "A3"  | IOSTANDARD = LVCMOS33;
-# PWM-Audio: Shutdown (PIO46), Gain (PIO47), PWM-Audio (PIO48) 
-NET "o_pwm"   LOC = "M2" | IOSTANDARD = LVCMOS33;
-NET "o_pwm_shutdown_n" LOC = "L2" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "o_pwm_gain"       LOC = "M1" | IOSTANDARD = LVCMOS33 | PULLUP;
+NET "i_uart_cts_n" LOC = "B1"  | IOSTANDARD = LVCMOS33;	# PIO29
+NET "o_uart"       LOC = "A2"  | IOSTANDARD = LVCMOS33;	# PIO28
+NET "i_uart"       LOC = "B3"  | IOSTANDARD = LVCMOS33;	# PIO27
+NET "o_uart_rts_n" LOC = "A3"  | IOSTANDARD = LVCMOS33;	# PIO26
+# PWM-Audio: Shutdown (PIO46), Gain (PIO47), PWM-Audio (PIO48)
+NET "o_pwm"            LOC = "M2" | IOSTANDARD = LVCMOS33;		# PIO48
+NET "o_pwm_shutdown_n" LOC = "L2" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO46
+NET "o_pwm_gain"       LOC = "M1" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO47
 # I2C
 NET "io_scl"  LOC = "E14" | IOSTANDARD = LVCMOS33 | PULLUP;	# io_scl, PIO44
 NET "io_sda"  LOC = "G13" | IOSTANDARD = LVCMOS33 | PULLUP;	# io_sda, PIO45
@@ -124,28 +127,28 @@ NET "o_gpio<15>" LOC = "E1" | IOSTANDARD = LVCMOS33;
 #
 # NET "i_gpio<0>"  LOC = "G13" | IOSTANDARD = LVCMOS33;	# io_sda
 # NET "i_gpio<1>"  LOC = "E14" | IOSTANDARD = LVCMOS33;	# io_scl
-NET "i_gpio<2>"  LOC = "D14" | IOSTANDARD = LVCMOS33;	# display miso
-NET "i_gpio<3>"  LOC = "E2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<4>"  LOC = "F1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<5>"  LOC = "F2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<6>"  LOC = "H1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<7>"  LOC = "H2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<8>"  LOC = "G1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<9>"  LOC = "G2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<10>" LOC = "J1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<11>" LOC = "J2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<12>" LOC = "K1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<13>" LOC = "K2" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<14>" LOC = "L1" | IOSTANDARD = LVCMOS33;
-NET "i_gpio<15>" LOC = "N12" | IOSTANDARD = LVCMOS33;
+NET "i_gpio<2>"  LOC = "D14"  | IOSTANDARD = LVCMOS33;	# display miso
+NET "i_gpio<3>"  LOC = "E2"   | IOSTANDARD = LVCMOS33;
+NET "i_gpio<4>"  LOC = "F1"   | IOSTANDARD = LVCMOS33;	# PIO35
+NET "i_gpio<5>"  LOC = "F2"   | IOSTANDARD = LVCMOS33;	# PIO36
+NET "i_gpio<6>"  LOC = "H1"   | IOSTANDARD = LVCMOS33;	# PIO37
+NET "i_gpio<7>"  LOC = "H2"   | IOSTANDARD = LVCMOS33;	# PIO38
+NET "i_gpio<8>"  LOC = "G1"   | IOSTANDARD = LVCMOS33;	# PIO39
+NET "i_gpio<9>"  LOC = "G2"   | IOSTANDARD = LVCMOS33;
+NET "i_gpio<10>" LOC = "J1"   | IOSTANDARD = LVCMOS33;
+NET "i_gpio<11>" LOC = "J2"   | IOSTANDARD = LVCMOS33;	# PIO42
+NET "i_gpio<12>" LOC = "K1"   | IOSTANDARD = LVCMOS33;	# PIO43
+NET "i_gpio<13>" LOC = "K2"   | IOSTANDARD = LVCMOS33;	# PIO44
+NET "i_gpio<14>" LOC = "L1"   | IOSTANDARD = LVCMOS33;	# PIO45
+NET "i_gpio<15>" LOC = "N12"  | IOSTANDARD = LVCMOS33;	# PIO06 -- OutOfOrder
 
-NET "o_kp_col<0>" LOC = "P5" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "o_kp_col<1>" LOC = "N5" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "o_kp_col<2>" LOC = "N6" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "o_kp_col<3>" LOC = "P7" | IOSTANDARD = LVCMOS33 | PULLUP;
+NET "o_kp_col<0>" LOC = "P5"  | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO01
+NET "o_kp_col<1>" LOC = "N5"  | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO02
+NET "o_kp_col<2>" LOC = "N6"  | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO03
+NET "o_kp_col<3>" LOC = "P7"  | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO04
 
-NET "i_kp_row<0>" LOC = "L14" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "i_kp_row<1>" LOC = "L13"  | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "i_kp_row<2>" LOC = "K14" | IOSTANDARD = LVCMOS33 | PULLUP;
-NET "i_kp_row<3>" LOC = "K13" | IOSTANDARD = LVCMOS33 | PULLUP;
+NET "i_kp_row<0>" LOC = "L14" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO07
+NET "i_kp_row<1>" LOC = "L13" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO08
+NET "i_kp_row<2>" LOC = "K14" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO09
+NET "i_kp_row<3>" LOC = "K13" | IOSTANDARD = LVCMOS33 | PULLUP;	# PIO10
 
