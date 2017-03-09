@@ -114,39 +114,11 @@ module toplevel(i_clk_8mhz,
 		.PSEN(1'b0),
 		.RST(1'b0));
 
-	//
-	// The UART serial interface
-	//
-	//	Perhaps this should be part of our simulation model as well.
-	//	For historical reasons, internal to Gisselquist Technology,
-	//	this has remained separate from the simulation, allowing the
-	//	simulation to bypass whether or not these two functions work.
-	//
-	wire		rx_stb, tx_stb;
-	wire	[7:0]	rx_data, tx_data;
-	wire		tx_busy;
-	wire	[29:0]	uart_setup;
-
 	// Baud rate is set by clock rate / baud rate desired.  Thus,
 	// 80 MHz / 9600 Baud = 8333, or about 0x208d.  We choose a slow
 	// speed such as 9600 Baud to help the CPU keep up with the serial
 	// port rate.
 	localparam [30:0]	UART_SETUP = 31'h4000208d;
-	assign	uart_setup = UART_SETUP;
-
-	wire		reset_s;
-	assign	reset_s = 1'b0;
-
-	wire	rx_break, rx_parity_err, rx_frame_err, rx_ck_uart, tx_break;
-	assign	tx_break = 1'b0;
-	rxuart	#(UART_SETUP)
-		rcvuart(clk_s, 1'b0, uart_setup,
-			i_uart, rx_stb, rx_data,
-			rx_break, rx_parity_err, rx_frame_err, rx_ck_uart);
-	txuart	#(UART_SETUP)
-		tcvuart(clk_s, reset_s, uart_setup, tx_break, tx_stb, tx_data,
-			i_uart_cts_n, o_uart, tx_busy);
-
 
 	//
 	// BUSMASTER
@@ -162,9 +134,10 @@ module toplevel(i_clk_8mhz,
 	wire	[15:0]	w_gpio;
 
 	wire	w_uart_rts_n;
-	busmaster	masterbus(clk_s, 1'b0,
-		// External ... bus control (if enabled)
-		rx_stb, rx_data, tx_stb, tx_data, tx_busy, w_uart_rts_n,
+	busmaster	#(.UART_SETUP(UART_SETUP))
+		masterbus(clk_s, 1'b0,
+		// Serial port wires
+		i_uart, o_uart_rts_n, o_uart, i_uart_cts_n,
 		// SPI/SD-card flash
 		o_qspi_cs_n, o_qspi_sck, qspi_dat, io_qspi_dat, qspi_bmod,
 		// Board lights and switches
@@ -174,7 +147,6 @@ module toplevel(i_clk_8mhz,
 		// GPIO lines
 		{ i_gpio, io_scl, io_sda }, w_gpio
 		);
-	assign	o_uart_rts_n = (w_uart_rts_n);
 
 	//
 	// Quad SPI support
