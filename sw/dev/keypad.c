@@ -48,9 +48,9 @@ static const char keymap[] = {
 	0x00,0x0f,0x0e,0x0d
 };
 
-char	keypadread(void) {
+int	keypadread(void) {
 	int	row, col, key;
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
+	volatile IOSPACE *const sys = _sys;
 
 	row = sys->io_spio & 0x0f00;
 	if (row != 0x0f00) {
@@ -113,7 +113,7 @@ char	keypadread(void) {
 }
 
 void	keypad_wait_for_release(void) {
-	IOSPACE *sys = (IOSPACE *)IOADDR;
+	volatile IOSPACE * const sys = _sys;
 	sys->io_spio = 0x0f00;
 	while((sys->io_spio & 0x0f00)!=0x0f00)
 #ifdef	ZIPOS
@@ -127,10 +127,13 @@ void	keypad_wait_for_release(void) {
 void keypad_task(void) {
 	clear(INT_KEYPAD, 0);
 	while(1) {
-		int	key;
+		int	key;	char ch;
 		wait(INT_KEYPAD,-1); // Automatically clears
 		key = keypadread();
-		write(FILENO_STDOUT, &key, 1);
+		if (key >= 0) {
+			ch = key;
+			write(FILENO_STDOUT, &ch, 1);
+		}
 		// Prepare for the next key
 		clear(INT_KEYPAD, 0);
 	}

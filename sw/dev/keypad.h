@@ -37,7 +37,7 @@
 //
 #ifndef	KEYPAD_H
 #define	KEYPAD_H
-extern	char	keypadread(void);
+extern	int	keypadread(void);
 extern	void	keypad_wait_for_release(void);
 
 #ifdef ZIPOS
