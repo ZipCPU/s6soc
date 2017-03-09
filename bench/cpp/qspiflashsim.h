@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	spiflashsim.h
 //
@@ -9,12 +9,12 @@
 //		board by Digilent.  As such, it is defined by 32 Mbits of
 //		memory (4 Mbyte).
 //
-// Creator:	Dan Gisselquist
+// Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -27,7 +27,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -35,7 +35,9 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//
 #ifndef	QSPIFLASHSIM_H
 #define	QSPIFLASHSIM_H
 
@@ -76,7 +78,7 @@ public:
 	QSPIFLASHSIM(void);
 	void	load(const char *fname) { load(0, fname); }
 	void	load(const unsigned addr, const char *fname);
-	void	write(const unsigned addr, const unsigned len, const uint32_t *buf);
+	void	write(const unsigned addr, const unsigned len, const char *buf);
 	void	debug(const bool dbg) { m_debug = dbg; }
 	bool	debug(void) const { return m_debug; }
 	int	operator()(const int csn, const int sck, const int dat);

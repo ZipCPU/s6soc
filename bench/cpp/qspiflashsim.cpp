@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 //
 // Filename: 	spiflashsim.cpp
@@ -14,12 +14,12 @@
 //		environment, where this simulator can be used in place of
 //		the actual hardware.
 //
-// Creator:	Dan Gisselquist
+// Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -32,7 +32,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -40,7 +40,9 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -49,7 +51,8 @@
 #include "regdefs.h"
 #include "qspiflashsim.h"
 
-#define	MEMBYTES	(FLASHWORDS<<2)
+#define	MEMBYTES	(1<<24)
+#define	MEMMASK		((MEMBYTES)-1)
 
 static	const unsigned	DEVID = 0x0115,
 	DEVESD = 0x014,
@@ -84,6 +87,7 @@ QSPIFLASHSIM::QSPIFLASHSIM(void) {
 
 void	QSPIFLASHSIM::load(const unsigned addr, const char *fname) {
 	FILE	*fp;
+	int	nr = 0;
 	size_t	len;
 
 	if (addr >= MEMBYTES)
@@ -91,7 +95,6 @@ void	QSPIFLASHSIM::load(const unsigned addr, const char *fname) {
 	len = MEMBYTES-addr*4;
 
 	if (NULL != (fp = fopen(fname, "r"))) {
-		int	nr = 0;
 		nr = fread(&m_mem[addr], sizeof(char), len, fp);
 		fclose(fp);
 		if (nr == 0) {
@@ -104,15 +107,10 @@ void	QSPIFLASHSIM::load(const unsigned addr, const char *fname) {
 	}
 }
 
-void	QSPIFLASHSIM::write(const unsigned addr, const unsigned len, const uint32_t *buf) {
-	char	*ptr;
-	if ((addr+len < SPIFLASH)||(addr >= SPIFLASH+MEMBYTES/4))
-		return;
-	printf("FLASH: Copying into memory at S6Add4 %08x, my addr %08x, %d values\n",
-		addr, (addr-SPIFLASH)<<2, len<<2);
-	ptr = &m_mem[(addr-SPIFLASH)<<2];
-	memcpy(ptr, buf, len<<2);
-	printf("%02x %02x %02x %02x\n", ptr[0]&0x0ff, ptr[1]&0x0ff, ptr[2]&0x0ff, ptr[3]&0x0ff);
+void	QSPIFLASHSIM::write(const unsigned offset, const unsigned len, const char *buf) {
+	uint32_t	moff = (offset & (MEMBYTES-1));
+
+	memcpy(&m_mem[moff], buf, len);
 }
 
 #define	QOREG(A)	m_oreg = ((m_oreg & (~0x0ff))|(A&0x0ff))
@@ -230,9 +228,9 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 		assert(m_quad_mode);
 		if (m_count == 24) {
 			if (m_debug) printf("QSPI: Entering from Quad-Read Idle to Quad-Read\n");
-			if (m_debug) printf("QSPI: QI/O Idle Addr = %02x\n", m_ireg&0x0ffffff);
-			m_addr = (m_ireg) & 0x0ffffff;
-			assert((m_addr & 0xfc00000)==0);
+			if (m_debug) printf("QSPI: QI/O Idle Addr = %02x\n", m_ireg&MEMMASK);
+			m_addr = (m_ireg) & MEMMASK;
+			assert((m_addr & (~(MEMMASK)))==0);
 			m_state = QSPIF_QUAD_READ;
 		} m_oreg = 0;
 	} else if (m_count == 8) {
@@ -374,7 +372,7 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 			break;
 		case QSPIF_RDID:
 			if (m_count == 32) {
-				m_addr = m_ireg & 0x0ffffff;
+				m_addr = m_ireg & MEMMASK;
 				if (m_debug) printf("READID, ADDR = %08x\n", m_addr);
 				QOREG((DEVID>>8));
 				if (m_debug) printf("QSPI: READING ID, %02x\n", (DEVID>>8)&0x0ff);
@@ -398,15 +396,15 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 			break;
 		case QSPIF_FAST_READ:
 			if (m_count == 32) {
-				m_addr = m_ireg & 0x0ffffff;
+				m_addr = m_ireg & MEMMASK;
 				if (m_debug) printf("FAST READ, ADDR = %08x\n", m_addr);
 				QOREG(0x0c3);
-				assert((m_addr & 0xfc00000)==0);
+				if (m_addr & (~(MEMMASK))) {
+					printf("QSPI: ADDR = %08x ? !!\n", m_addr);
+				} assert((m_addr & (~(MEMMASK)))==0);
 			} else if ((m_count >= 40)&&(0 == (m_sreg&0x01))) {
-				//if (m_count == 40)
-					//printf("DUMMY BYTE COMPLETE ...\n");
 				QOREG(m_mem[m_addr++]);
-				// if (m_debug) printf("SPIF[%08x] = %02x\n", m_addr-1, m_oreg);
+				if (m_debug) printf("SPIF[%08x] = %02x\n", m_addr-1, m_oreg);
 			} else m_oreg = 0;
 			break;
 		case QSPIF_QUAD_READ_CMD:
@@ -414,17 +412,18 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 			// that changes the timings, else we'd use quad_Read
 			// below
 			if (m_count == 32) {
-				m_addr = m_ireg & 0x0ffffff;
-				// printf("FAST READ, ADDR = %08x\n", m_addr);
-				// printf("QSPI: QUAD READ, ADDR = %06x\n", m_addr);
-				assert((m_addr & 0xfc00000)==0);
+				m_addr = m_ireg & MEMMASK;
+				if (m_debug) printf("QSPI: QUAD READ, ADDR = %06x\n", m_addr);
+				assert((m_addr & (~(MEMMASK)))==0);
 			} else if (m_count == 32+24) {
 				m_mode_byte = (m_ireg>>16) & 0x0ff;
-				// printf("QSPI: MODE BYTE = %02x\n", m_mode_byte);
+				if (m_debug) printf("QSPI: MODE BYTE = %02x\n", m_mode_byte);
+				// Send the first byte in the response ... since it's time to start sending bytes
+				QOREG(m_mem[m_addr++]);
 			} else if ((m_count > 32+24)&&(0 == (m_sreg&0x01))) {
 				QOREG(m_mem[m_addr++]);
-				// printf("QSPIF[%08x]/QR = %02x\n",
-					// m_addr-1, m_oreg);
+				if (m_debug) printf("QSPIF[%08x]/QR = %02x\n",
+					m_addr-1, m_oreg);
 			} else m_oreg = 0;
 			break;
 		case QSPIF_QUAD_READ:
@@ -433,14 +432,14 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 				// printf("QSPI/QR: MODE BYTE = %02x\n", m_mode_byte);
 			} else if ((m_count >= 32+16)&&(0 == (m_sreg&0x01))) {
 				QOREG(m_mem[m_addr++]);
-				// printf("QSPIF[%08x]/QR = %02x\n", m_addr-1, m_oreg & 0x0ff);
+				if (m_debug) printf("QSPIF[%08x]/QR = %02x\n", m_addr-1, m_oreg & 0x0ff);
 			} else m_oreg = 0;
 			break;
 		case QSPIF_PP:
 			if (m_count == 32) {
-				m_addr = m_ireg & 0x0ffffff;
+				m_addr = m_ireg & MEMMASK;
 				if (m_debug) printf("QSPI: PAGE-PROGRAM ADDR = %06x\n", m_addr);
-				assert((m_addr & 0xfc00000)==0);
+				assert((m_addr & (~(MEMMASK)))==0);
 				// m_page = m_addr >> 8;
 				for(int i=0; i<256; i++)
 					m_pmem[i] = 0x0ff;
@@ -451,10 +450,10 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 			} break;
 		case QSPIF_QPP:
 			if (m_count == 32) {
-				m_addr = m_ireg & 0x0ffffff;
+				m_addr = m_ireg & MEMMASK;
 				m_quad_mode = true;
 				if (m_debug) printf("QSPI/QR: PAGE-PROGRAM ADDR = %06x\n", m_addr);
-				assert((m_addr & 0xfc00000)==0);
+				assert((m_addr & (~(MEMMASK)))==0);
 				// m_page = m_addr >> 8;
 				for(int i=0; i<256; i++)
 					m_pmem[i] = 0x0ff;
@@ -467,7 +466,7 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 			if (m_count == 32) {
 				m_addr = m_ireg & 0x0ffc000;
 				if (m_debug) printf("SECTOR_ERASE ADDRESS = %08x\n", m_addr);
-				assert((m_addr & 0xfc00000)==0);
+				assert((m_addr & (~(MEMMASK)))==0);
 			} break;
 		case QSPIF_RELEASE:
 			if (m_count >= 32) {
