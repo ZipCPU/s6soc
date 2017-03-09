@@ -52,6 +52,8 @@
 // #include "twoc.h"
 #include "qspiflashsim.h"
 #include "uartsim.h"
+#include "zipelf.h"
+#include "byteswap.h"
 
 typedef	uint32_t	BUSW;
 
@@ -65,37 +67,196 @@ public:
 	unsigned operator()(const unsigned o_kpd) { return 0; }
 };
 
-// Add a reset line, since Vbusmaster doesn't have one
-class	Vbusmasterr : public Vbusmaster {
-public:
-	int	i_rst;
-};
+#define	tx_busy		v__DOT__tcvuart__DOT__r_busy
+#define	rx_stb		v__DOT__rx_stb
+#define	uart_setup	v__DOT__tcvuart__DOT__r_setup
+#define	cpu_regset	v__DOT__swic__DOT__thecpu__DOT__regset
+#define	cpu_gie		v__DOT__swic__DOT__thecpu__DOT__r_gie
+#define	cpu_ipc		v__DOT__swic__DOT__thecpu__DOT__ipc
+#define	cpu_upc		v__DOT__swic__DOT__thecpu__DOT__r_upc
+#define	cpu_op_Av	v__DOT__swic__DOT__thecpu__DOT__r_op_Av
+#define	cpu_op_Bv	v__DOT__swic__DOT__thecpu__DOT__r_op_Bv
+#define	cpu_iflags	v__DOT__swic__DOT__thecpu__DOT__w_iflags
+#define	cpu_uflags	v__DOT__swic__DOT__thecpu__DOT__w_uflags
+#define	cpu_pf_valid	v__DOT__swic__DOT__thecpu__DOT__pf_valid
+#define	cpu_pf_pc	v__DOT__swic__DOT__thecpu__DOT__pf_pc
+#define	cpu_pf_instruction_pc	v__DOT__swic__DOT__thecpu__DOT__pf_instruction_pc
+#define	cpu_pf_instruction	v__DOT__swic__DOT__thecpu__DOT__pf_instruction
+#define	cpu_op_valid	v__DOT__swic__DOT__thecpu__DOT__op_valid
+#define	cpu_op_sim	v__DOT__swic__DOT__thecpu__DOT__op_sim
+#define	cpu_sim_immv	v__DOT__swic__DOT__thecpu__DOT__op_sim_immv
+#define	cpu_alu_ce	v__DOT__swic__DOT__thecpu__DOT__alu_ce
+//
+#define	pic_gie		v__DOT__pic__DOT__r_gie
+#define	pic_int_enable	v__DOT__pic__DOT__r_int_enable
+#define	pic_any		v__DOT__pic__DOT__r_any
+#define	pic_int_state	v__DOT__pic__DOT__r_int_state
+#define	wb_cyc		v__DOT__wb_cyc
+#define	wb_stb		v__DOT__wb_stb
+#define	wb_we		v__DOT__wb_we
+#define	wb_data		v__DOT__swic__DOT__thecpu__DOT__mem_data
+#define	wb_addr		v__DOT__w_zip_addr
+//
+#define	wb_ack		v__DOT__wb_ack
+#define	wb_stall	v__DOT__wb_stall
+#define	wb_idata	v__DOT__wb_idata
+//
+#define	watchdog_int	v__DOT__watchdog_int
 
 // No particular "parameters" need definition or redefinition here.
-class	ZIPSIM_TB : public TESTB<Vbusmasterr> {
+class	ZIPSIM_TB : public TESTB<Vbusmaster> {
 public:
 	QSPIFLASHSIM	m_flash;
 	UARTSIM		m_uart;
 	GPIOSIM		m_gpio;
 	KEYPADSIM	m_keypad;
 	unsigned	m_last_led;
+	unsigned	m_last_gpio, m_last_pf_pc;
 	time_t		m_start_time;
 	FILE		*m_dbg;
 
-	ZIPSIM_TB(void) : m_uart(0x2b6) {
+	ZIPSIM_TB(int serial_port, bool debug) : m_uart(serial_port) {
 		m_start_time = time(NULL);
-		m_dbg = fopen("dbg.txt","w");
+		if (debug)
+			m_dbg = fopen("dbg.txt","w");
+		else	m_dbg = NULL;
+
+		m_last_led = m_last_gpio = m_last_pf_pc = -1;
 	}
 
 	void	reset(void) {
 		m_flash.debug(false);
 	}
 
+	void	close(void) {
+		closetrace();
+	}
+
+	void dump(const uint32_t *regp) {
+		uint32_t	uccv, iccv;
+		fflush(stderr);
+		fflush(stdout);
+		printf("ZIPM--DUMP: ");
+		if (m_core->cpu_gie)
+			printf("Interrupts-enabled\n");
+		else
+			printf("Supervisor mode\n");
+		printf("\n");
+
+		iccv = m_core->cpu_iflags;
+		uccv = m_core->cpu_uflags;
+
+		printf("sR0 : %08x ", regp[0]);
+		printf("sR1 : %08x ", regp[1]);
+		printf("sR2 : %08x ", regp[2]);
+		printf("sR3 : %08x\n",regp[3]);
+		printf("sR4 : %08x ", regp[4]);
+		printf("sR5 : %08x ", regp[5]);
+		printf("sR6 : %08x ", regp[6]);
+		printf("sR7 : %08x\n",regp[7]);
+		printf("sR8 : %08x ", regp[8]);
+		printf("sR9 : %08x ", regp[9]);
+		printf("sR10: %08x ", regp[10]);
+		printf("sR11: %08x\n",regp[11]);
+		printf("sR12: %08x ", regp[12]);
+		printf("sSP : %08x ", regp[13]);
+		printf("sCC : %08x ", iccv);
+		printf("sPC : %08x\n",m_core->cpu_ipc);
+
+		printf("\n");
+
+		printf("uR0 : %08x ", regp[16]);
+		printf("uR1 : %08x ", regp[17]);
+		printf("uR2 : %08x ", regp[18]);
+		printf("uR3 : %08x\n",regp[19]);
+		printf("uR4 : %08x ", regp[20]);
+		printf("uR5 : %08x ", regp[21]);
+		printf("uR6 : %08x ", regp[22]);
+		printf("uR7 : %08x\n",regp[23]);
+		printf("uR8 : %08x ", regp[24]);
+		printf("uR9 : %08x ", regp[25]);
+		printf("uR10: %08x ", regp[26]);
+		printf("uR11: %08x\n",regp[27]);
+		printf("uR12: %08x ", regp[28]);
+		printf("uSP : %08x ", regp[29]);
+		printf("uCC : %08x ", uccv);
+		printf("uPC : %08x\n",m_core->cpu_upc);
+		printf("\n");
+		fflush(stderr);
+		fflush(stdout);
+	}
+
+	void	execsim(const uint32_t imm) {
+		uint32_t	*regp = m_core->cpu_regset;
+		int		rbase;
+		rbase = (m_core->cpu_gie)?16:0;
+
+		fflush(stdout);
+		if ((imm & 0x03fffff)==0)
+			return;
+		// fprintf(stderr, "SIM-INSN(0x%08x)\n", imm);
+		if ((imm & 0x0fffff)==0x00100) {
+			// SIM Exit(0)
+			close();
+			exit(0);
+		} else if ((imm & 0x0ffff0)==0x00310) {
+			// SIM Exit(User-Reg)
+			int	rcode;
+			rcode = regp[(imm&0x0f)+16] & 0x0ff;
+			close();
+			exit(rcode);
+		} else if ((imm & 0x0ffff0)==0x00300) {
+			// SIM Exit(Reg)
+			int	rcode;
+			rcode = regp[(imm&0x0f)+rbase] & 0x0ff;
+			close();
+			exit(rcode);
+		} else if ((imm & 0x0fff00)==0x00100) {
+			// SIM Exit(Imm)
+			int	rcode;
+			rcode = imm & 0x0ff;
+			close();
+			exit(rcode);
+		} else if ((imm & 0x0fffff)==0x002ff) {
+			// Full/unconditional dump
+			printf("SIM-DUMP\n");
+			dump(regp);
+		} else if ((imm & 0x0ffff0)==0x00200) {
+			// Dump a register
+			int rid = (imm&0x0f)+rbase;
+			printf("%8ld @%08x R[%2d] = 0x%08x\n", m_tickcount,
+				m_core->cpu_ipc, rid, regp[rid]);
+		} else if ((imm & 0x0ffff0)==0x00210) {
+			// Dump a user register
+			int rid = (imm&0x0f);
+			printf("%8ld @%08x uR[%2d] = 0x%08x\n", m_tickcount,
+				m_core->cpu_ipc, rid, regp[rid+16]);
+		} else if ((imm & 0x0ffff0)==0x00230) {
+			// SOUT[User Reg]
+			int rid = (imm&0x0f)+16;
+			printf("%c", regp[rid]&0x0ff);
+		} else if ((imm & 0x0fffe0)==0x00220) {
+			// SOUT[User Reg]
+			int rid = (imm&0x0f)+rbase;
+			printf("%c", regp[rid]&0x0ff);
+		} else if ((imm & 0x0fff00)==0x00400) {
+			// SOUT[Imm]
+			printf("%c", imm&0x0ff);
+		} else { // if ((insn & 0x0f7c00000)==0x77800000)
+			uint32_t	immv = imm & 0x03fffff;
+			// Simm instruction that we dont recognize
+			// if (imm)
+			// printf("SIM 0x%08x\n", immv);
+			printf("SIM 0x%08x (ipc = %08x, upc = %08x)\n", immv,
+				m_core->cpu_ipc, m_core->cpu_upc);
+		} fflush(stdout);
+	}
+
 	void	tick(void) {
 		if ((m_tickcount & ((1<<28)-1))==0) {
 			double	ticks_per_second = m_tickcount;
 			time_t	nsecs = (time(NULL)-m_start_time);
-			if (nsecs > 0) {
+			if ((nsecs > 0)&&(ticks_per_second>0)) {
 				ticks_per_second /= (double)nsecs;
 				printf(" ********   %.6f TICKS PER SECOND\n", 
 					ticks_per_second);
@@ -119,35 +280,41 @@ public:
 		m_core->i_kp_row = m_keypad(m_core->o_kp_col);
 
 		// And the UART
-		m_core->i_rx_stb  = m_uart.rx(m_core->i_rx_data);
-		m_core->i_tx_busy = m_uart.tx(m_core->o_tx_stb, m_core->o_tx_data);
+		m_core->i_uart_cts_n = 0;
+		m_uart.setup(m_core->uart_setup);
+		m_core->i_uart  = m_uart(m_core->o_uart);
 
-		TESTB<Vbusmasterr>::tick();
+		TESTB<Vbusmaster>::tick();
 
-		if (m_core->o_led != m_last_led) {
-			printf("LED: %08x\r", m_core->o_led); fflush(stdout);
-			m_last_led = m_core->o_led;
+		if ((m_core->o_led != m_last_led)||(m_core->o_gpio != m_last_gpio)||(m_core->cpu_pf_pc != m_last_pf_pc)) {
+			printf("LED: %x\tGPIO: %04x\tPF-PC = %08x\r", m_core->o_led,
+					m_core->o_gpio, m_core->cpu_pf_pc);
+			fflush(stdout);
+			m_last_led  = m_core->o_led;
+			m_last_gpio = m_core->o_gpio;
 		}
 
+		if (m_core->watchdog_int) {
+			printf("\nWATCHDOG-INT!!! CPU-sPC = %08x, TICKS = %08lx\n", m_core->cpu_ipc, m_tickcount);
+		}
 		
 		if (m_dbg) fprintf(m_dbg, "%10ld - PC: %08x:%08x [%08x:%08x:%08x:%08x:%08x],%08x,%08x,%d,%08x,%08x (%x,%x/0x%08x)\n",
 			m_tickcount,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__ipc,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__r_upc,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[0],
-			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[1],
-			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[2],
-			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[3],
-			m_core->v__DOT__swic__DOT__thecpu__DOT__regset[15],
+			m_core->cpu_ipc,
+			m_core->cpu_upc,
+			m_core->cpu_regset[0],
+			m_core->cpu_regset[1],
+			m_core->cpu_regset[2],
+			m_core->cpu_regset[3],
+			m_core->cpu_regset[15],
 			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__r_I,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__r_op_Bv,
+			m_core->cpu_op_Bv,
 			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__w_dcdR_pc,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__r_op_Av,
+			m_core->cpu_op_Av,
 			m_core->v__DOT__swic__DOT__thecpu__DOT__wr_gpreg_vl,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__w_iflags,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__w_uflags,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__pf_pc
-			);
+			m_core->cpu_iflags,
+			m_core->cpu_uflags,
+			m_core->cpu_pf_pc);
 		if ((!m_core->o_qspi_cs_n)&&(m_dbg))
 			fprintf(m_dbg, "QSPI: [CS,SCK,DAT (MOD)] = %d,%d,%02x,%d -> %04x %7s, state= %x/(%d)\n",
 				m_core->o_qspi_cs_n,
@@ -159,322 +326,35 @@ public:
 				m_core->v__DOT__flashmem__DOT__state,
 				m_core->v__DOT__flashmem__DOT__lldriver__DOT__state);
 
-		if ((m_core->v__DOT__wb_cyc)&&(m_dbg))
+		if ((m_core->wb_cyc)&&(m_dbg))
 		fprintf(m_dbg, "WB: %s/%s/%s[@0x%08x] %08x ->%s/%s %08x\n", 
-			(m_core->v__DOT__wb_cyc)?"CYC":"   ",
-			(m_core->v__DOT__wb_stb)?"STB":"   ",
-			(m_core->v__DOT__wb_we )?"WE ":"   ",
-			(m_core->v__DOT__w_zip_addr),
-#define	wb_data	v__DOT__swic__DOT__thecpu__DOT__mem_data
+			(m_core->wb_cyc)?"CYC":"   ",
+			(m_core->wb_stb)?"STB":"   ",
+			(m_core->wb_we )?"WE ":"   ",
+			(m_core->wb_addr),
 			(m_core->wb_data),
-			(m_core->v__DOT__wb_ack)?"ACK":"   ",
-			(m_core->v__DOT__wb_stall)?"STL":"   ",
-			(m_core->v__DOT__wb_idata)
+			(m_core->wb_ack)?"ACK":"   ",
+			(m_core->wb_stall)?"STL":"   ",
+			(m_core->wb_idata)
 			);
-		/*
-		if (m_dbg)
-			fprintf(m_dbg, "PIC: %3s(%4x) %3s(%4x)%s\n",
-				(m_core->v__DOT__pic__DOT__r_gie)?"GIE":"",
-				(m_core->v__DOT__pic__DOT__r_int_enable),
-				(m_core->v__DOT__pic__DOT__r_any)?"ANY":"",
-				(m_core->v__DOT__pic__DOT__r_int_state),
-				(m_core->v__DOT__pic__DOT__r_interrupt)?" ---> INT!":"");
-		*/
 
-		if ((m_core->v__DOT__swic__DOT__thecpu__DOT__pf_valid)&&(m_dbg))
+		if ((m_core->cpu_pf_valid)&&(m_dbg))
 			fprintf(m_dbg, "PC: %08x - %08x, uart=%d,%d, pic = %d,%04x,%0d,%04x\n",
-				m_core->v__DOT__swic__DOT__thecpu__DOT__pf_instruction_pc,
-				m_core->v__DOT__swic__DOT__thecpu__DOT__pf_instruction,
-				m_core->i_rx_stb, m_core->i_tx_busy,
-				m_core->v__DOT__pic__DOT__r_gie,
-				m_core->v__DOT__pic__DOT__r_int_enable,
-				m_core->v__DOT__pic__DOT__r_any,
-				m_core->v__DOT__pic__DOT__r_int_state);
+				m_core->cpu_pf_instruction_pc,
+				m_core->cpu_pf_instruction,
+				m_core->rx_stb, m_core->tx_busy,
+				m_core->pic_gie,
+				m_core->pic_int_enable,
+				m_core->pic_any,
+				m_core->pic_int_state);
+
+
+// SIM instruction(s)
+		if ((m_core->cpu_op_sim)&&(m_core->cpu_op_valid)
+			&&(m_core->cpu_alu_ce))
+			execsim(m_core->cpu_sim_immv);
 	}
 };
-
-ZIPSIM_TB	*tb;
-
-bool	iself(const char *fname) {
-	FILE	*fp;
-	bool	ret = true;
-
-	if ((!fname)||(!fname[0]))
-		return false;
-
-	fp = fopen(fname, "rb");
-
-	if (!fp)	return false;
-	if (0x7f != fgetc(fp))	ret = false;
-	if ('E'  != fgetc(fp))	ret = false;
-	if ('L'  != fgetc(fp))	ret = false;
-	if ('F'  != fgetc(fp))	ret = false;
-	fclose(fp);
-	return 	ret;
-}
-
-long	fgetwords(FILE *fp) {
-	// Return the number of words in the current file, and return the 
-	// file as though it had never been adjusted
-	long	fpos, flen;
-	fpos = ftell(fp);
-	if (0 != fseek(fp, 0l, SEEK_END)) {
-		fprintf(stderr, "ERR: Could not determine file size\n");
-		perror("O/S Err:");
-		exit(-2);
-	} flen = ftell(fp);
-	if (0 != fseek(fp, fpos, SEEK_SET)) {
-		fprintf(stderr, "ERR: Could not seek on file\n");
-		perror("O/S Err:");
-		exit(-2);
-	} flen /= sizeof(BUSW);
-	return flen;
-}
-
-class	SECTION {
-public:
-	unsigned	m_start, m_len;
-	BUSW	m_data[1];
-};
-
-SECTION	**singlesection(int nwords) {
-	fprintf(stderr, "NWORDS = %d\n", nwords);
-	size_t	sz = (2*(sizeof(SECTION)+sizeof(SECTION *))
-		+(nwords-1)*(sizeof(BUSW)));
-	char	*d = (char *)malloc(sz);
-	SECTION **r = (SECTION **)d;
-	memset(r, 0, sz);
-	r[0] = (SECTION *)(&d[2*sizeof(SECTION *)]);
-	r[0]->m_len   = nwords;
-	r[1] = (SECTION *)(&r[0]->m_data[r[0]->m_len]);
-	r[0]->m_start = 0;
-	r[1]->m_start = 0;
-	r[1]->m_len   = 0;
-
-	return r;
-}
-
-SECTION **rawsection(const char *fname) {
-	SECTION		**secpp, *secp;
-	unsigned	num_words;
-	FILE		*fp;
-	int		nr;
-
-	fp = fopen(fname, "r");
-	if (fp == NULL) {
-		fprintf(stderr, "Could not open: %s\n", fname);
-		exit(-1);
-	}
-
-	if ((num_words=fgetwords(fp)) > FLASHWORDS) {
-		fprintf(stderr, "File overruns flash memory\n");
-		exit(-1);
-	}
-	secpp = singlesection(num_words);
-	secp = secpp[0];
-	secp->m_start = RESET_ADDRESS;
-	secp->m_len = num_words;
-	nr= fread(secp->m_data, sizeof(BUSW), num_words, fp);
-	if (nr != (int)num_words) {
-		fprintf(stderr, "Could not read entire file\n");
-		perror("O/S Err:");
-		exit(-2);
-	} assert(secpp[1]->m_len == 0);
-
-	return secpp;
-}
-
-unsigned	byteswap(unsigned n) {
-	unsigned	r;
-
-	r = (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-	r = (r<<8) | (n&0x0ff); n>>= 8;
-
-	return r;
-}
-
-#include <libelf.h>
-#include <gelf.h>
-
-void	elfread(const char *fname, unsigned &entry, SECTION **&sections) {
-	Elf	*e;
-	int	fd, i;
-	size_t	n;
-	char	*id;
-	Elf_Kind	ek;
-	GElf_Ehdr	ehdr;
-	GElf_Phdr	phdr;
-	const	bool	dbg = false;
-
-	if (elf_version(EV_CURRENT) == EV_NONE) {
-		fprintf(stderr, "ELF library initialization err, %s\n", elf_errmsg(-1));
-		perror("O/S Err:");
-		exit(EXIT_FAILURE);
-	} if ((fd = open(fname, O_RDONLY, 0)) < 0) {
-		fprintf(stderr, "Could not open %s\n", fname);
-		perror("O/S Err:");
-		exit(EXIT_FAILURE);
-	} if ((e = elf_begin(fd, ELF_C_READ, NULL))==NULL) {
-		fprintf(stderr, "Could not run elf_begin, %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	}
-
-	ek = elf_kind(e);
-	if (ek == ELF_K_ELF) {
-		; // This is the kind of file we should expect
-	} else if (ek == ELF_K_AR) {
-		fprintf(stderr, "Cannot run an archive!\n");
-		exit(EXIT_FAILURE);
-	} else if (ek == ELF_K_NONE) {
-		;
-	} else {
-		fprintf(stderr, "Unexpected ELF file kind!\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (gelf_getehdr(e, &ehdr) == NULL) {
-		fprintf(stderr, "getehdr() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if ((i=gelf_getclass(e)) == ELFCLASSNONE) {
-		fprintf(stderr, "getclass() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if ((id = elf_getident(e, NULL)) == NULL) {
-		fprintf(stderr, "getident() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	} if (i != ELFCLASS32) {
-		fprintf(stderr, "This is a 64-bit ELF file, ZipCPU ELF files are all 32-bit\n");
-		exit(EXIT_FAILURE);
-	}
-
-	if (dbg) {
-	printf("    %-20s 0x%jx\n", "e_type", (uintmax_t)ehdr.e_type);
-	printf("    %-20s 0x%jx\n", "e_machine", (uintmax_t)ehdr.e_machine);
-	printf("    %-20s 0x%jx\n", "e_version", (uintmax_t)ehdr.e_version);
-	printf("    %-20s 0x%jx\n", "e_entry", (uintmax_t)ehdr.e_entry);
-	printf("    %-20s 0x%jx\n", "e_phoff", (uintmax_t)ehdr.e_phoff);
-	printf("    %-20s 0x%jx\n", "e_shoff", (uintmax_t)ehdr.e_shoff);
-	printf("    %-20s 0x%jx\n", "e_flags", (uintmax_t)ehdr.e_flags);
-	printf("    %-20s 0x%jx\n", "e_ehsize", (uintmax_t)ehdr.e_ehsize);
-	printf("    %-20s 0x%jx\n", "e_phentsize", (uintmax_t)ehdr.e_phentsize);
-	printf("    %-20s 0x%jx\n", "e_shentsize", (uintmax_t)ehdr.e_shentsize);
-	printf("\n");
-	}
-
-
-	// Check whether or not this is an ELF file for the ZipCPU ...
-	if (ehdr.e_machine != 0x0dadd) {
-		fprintf(stderr, "This is not a ZipCPU ELF file\n");
-		exit(EXIT_FAILURE);
-	}
-
-	// Get our entry address
-	entry = ehdr.e_entry;
-
-
-	// Now, let's go look at the program header
-	if (elf_getphdrnum(e, &n) != 0) {
-		fprintf(stderr, "elf_getphdrnum() failed: %s\n", elf_errmsg(-1));
-		exit(EXIT_FAILURE);
-	}
-
-	unsigned total_octets = 0, current_offset=0, current_section=0;
-	for(i=0; i<(int)n; i++) {
-		total_octets += sizeof(SECTION *)+sizeof(SECTION);
-
-		if (gelf_getphdr(e, i, &phdr) != &phdr) {
-			fprintf(stderr, "getphdr() failed: %s\n", elf_errmsg(-1));
-			exit(EXIT_FAILURE);
-		}
-
-		if (dbg) {
-		printf("    %-20s 0x%x\n", "p_type",   phdr.p_type);
-		printf("    %-20s 0x%jx\n", "p_offset", phdr.p_offset);
-		printf("    %-20s 0x%jx\n", "p_vaddr",  phdr.p_vaddr);
-		printf("    %-20s 0x%jx\n", "p_paddr",  phdr.p_paddr);
-		printf("    %-20s 0x%jx\n", "p_filesz", phdr.p_filesz);
-		printf("    %-20s 0x%jx\n", "p_memsz",  phdr.p_memsz);
-		printf("    %-20s 0x%x [", "p_flags",  phdr.p_flags);
-
-		if (phdr.p_flags & PF_X)	printf(" Execute");
-		if (phdr.p_flags & PF_R)	printf(" Read");
-		if (phdr.p_flags & PF_W)	printf(" Write");
-		printf("]\n");
-		printf("    %-20s 0x%jx\n", "p_align", phdr.p_align);
-		}
-
-		total_octets += phdr.p_memsz;
-	}
-
-	char	*d = (char *)malloc(total_octets + sizeof(SECTION)+sizeof(SECTION *));
-	memset(d, 0, total_octets);
-
-	SECTION **r = sections = (SECTION **)d;
-	current_offset = (n+1)*sizeof(SECTION *);
-	current_section = 0;
-
-	for(i=0; i<(int)n; i++) {
-		r[i] = (SECTION *)(&d[current_offset]);
-
-		if (gelf_getphdr(e, i, &phdr) != &phdr) {
-			fprintf(stderr, "getphdr() failed: %s\n", elf_errmsg(-1));
-			exit(EXIT_FAILURE);
-		}
-
-		if (dbg) {
-		printf("    %-20s 0x%jx\n", "p_offset", phdr.p_offset);
-		printf("    %-20s 0x%jx\n", "p_vaddr",  phdr.p_vaddr);
-		printf("    %-20s 0x%jx\n", "p_paddr",  phdr.p_paddr);
-		printf("    %-20s 0x%jx\n", "p_filesz", phdr.p_filesz);
-		printf("    %-20s 0x%jx\n", "p_memsz",  phdr.p_memsz);
-		printf("    %-20s 0x%x [", "p_flags",  phdr.p_flags);
-
-		if (phdr.p_flags & PF_X)	printf(" Execute");
-		if (phdr.p_flags & PF_R)	printf(" Read");
-		if (phdr.p_flags & PF_W)	printf(" Write");
-		printf("]\n");
-
-		printf("    %-20s 0x%jx\n", "p_align", phdr.p_align);
-		}
-
-		current_section++;
-
-		r[i]->m_start = phdr.p_vaddr;
-		r[i]->m_len   = phdr.p_filesz/ sizeof(BUSW);
-
-		current_offset += phdr.p_memsz + sizeof(SECTION);
-
-		// Now, let's read in our section ...
-		if (lseek(fd, phdr.p_offset, SEEK_SET) < 0) {
-			fprintf(stderr, "Could not seek to file position %08lx\n", phdr.p_offset);
-			perror("O/S Err:");
-			exit(EXIT_FAILURE);
-		} if (phdr.p_filesz > phdr.p_memsz)
-			phdr.p_filesz = 0;
-		if (read(fd, r[i]->m_data, phdr.p_filesz) != (int)phdr.p_filesz) {
-			fprintf(stderr, "Didnt read entire section\n");
-			perror("O/S Err:");
-			exit(EXIT_FAILURE);
-		}
-
-		// Next, we need to byte swap it from big to little endian
-		for(unsigned j=0; j<r[i]->m_len; j++)
-			r[i]->m_data[j] = byteswap(r[i]->m_data[j]);
-
-		if (dbg) for(unsigned j=0; j<r[i]->m_len; j++)
-			fprintf(stderr, "ADR[%04x] = %08x\n", r[i]->m_start+j,
-			r[i]->m_data[j]);
-	}
-
-	r[i] = (SECTION *)(&d[current_offset]);
-	r[current_section]->m_start = 0;
-	r[current_section]->m_len   = 0;
-
-	elf_end(e);
-	close(fd);
-}
-
 
 void	usage(void) {
 	fprintf(stderr, "Usage: zip_sim flash_program\n");
@@ -482,35 +362,69 @@ void	usage(void) {
 
 int	main(int argc, char **argv) {
 	Verilated::commandArgs(argc, argv);
-	tb = new ZIPSIM_TB;
-	const char	*codef = NULL;
+	ZIPSIM_TB	*tb;
+	const char	*codef = NULL, *trace_file = NULL;
+	bool	debug_flag = false;
+	int	serial_port = -1;
 
 	for(int argn=1; argn<argc; argn++) {
-		if (argv[argn][0] == '-') {
-			usage();
-			exit(-1);
-		} else
+		if (argv[argn][0] == '-') for (int j=1;
+					(j<512)&&(argv[argn][j]); j++) {
+			switch(tolower(argv[argn][j])) {
+			case 'c': break; // no comms to copy to stdout break;
+			case 'd': debug_flag = true;
+				if (trace_file == NULL)
+					trace_file = "trace.vcd";
+				break;
+			case 'p': break; // S6 has no fpga command port
+			case 's': serial_port=atoi(argv[++argn]); j=1000; break;
+			case 't': trace_file = (argn+1<argc)?argv[++argn]:NULL;j=1000; break;
+			case 'h': usage(); exit(EXIT_SUCCESS); break;
+			default:
+				fprintf(stderr, "ERR: Unexpected flag, -%c\n\n",
+					argv[argn][j]);
+				usage(); exit(EXIT_FAILURE);
+			}
+		} else if (iself(argv[argn])) {
 			codef = argv[argn];
+		} else {
+			fprintf(stderr, "ERR: Unknown/unexpected argument: %s\n",
+				argv[argn]);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if ((!codef)||(!codef[0]))
 		fprintf(stderr, "No executable code filename found!\n");
 
+	if (serial_port < 0) {
+		printf("Using the terminal as a SERIAL port\n");
+		serial_port = 0;
+	}
+	tb = new ZIPSIM_TB(serial_port, debug_flag);
+
 	if (access(codef, R_OK)!=0)
 		fprintf(stderr, "Cannot read code filename, %s\n", codef);
 
 	if (iself(codef)) {
-		SECTION	**secpp, *secp;
-		BUSW	entry;
+		ELFSECTION	**secpp, *secp;
+		BUSW		entry;
 		elfread(codef, entry, secpp);
+
+		assert(entry == RESET_ADDRESS);
 
 		for(int i=0; secpp[i]->m_len; i++) {
 			secp = secpp[i];
-			tb->m_flash.write(secp->m_start, secp->m_len, secp->m_data);
+			tb->m_flash.write(secp->m_start, secp->m_len, (char *)&secp->m_data);
 		}
 	} else {
-		tb->m_flash.load(RESET_ADDRESS, codef);
+		fprintf(stderr, "%s is not a ZipCPU ELF executable\n", codef);
+		exit(EXIT_FAILURE);
 	}
+
+	// if (debug_flag) { }
+	if (trace_file)
+		tb->opentrace(trace_file);
 
 	tb->reset();
 
