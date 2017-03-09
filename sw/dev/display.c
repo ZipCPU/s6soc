@@ -58,24 +58,25 @@ static void	dispwait(void) {
 void	dispchar(char ch) {
 	if (!ch) // Don't display null characters
 		return;
-	IOSPACE	*sys = (IOSPACE *)IOADDR;
+	int	ich = ch;
+
 	// Send the character
 	for(int i=0; i<8; i++) {
 		int gpiov = GPOCLRV(GPO_MOSI|GPO_SCK|GPO_SS);
-		if (ch&0x80)
+		if (ich&0x80)
 			gpiov |= GPOSETV(GPO_MOSI);
-		sys->io_gpio = gpiov;
+		_sys->io_gpio = gpiov;
 		dispwait();
-		sys->io_gpio = GPOSETV(GPO_SCK);
+		_sys->io_gpio = GPOSETV(GPO_SCK);
 		dispwait();
-		ch<<=1;
+		ich<<=1;
 	}
 
 	// Turn off the clock
-	sys->io_gpio = GPOCLRV(GPO_SCK);
+	_sys->io_gpio = GPOCLRV(GPO_SCK);
 	dispwait();
 	// Then the port
-	sys->io_gpio = GPOSETV(GPO_SS);
+	_sys->io_gpio = GPOSETV(GPO_SS);
 	dispwait();
 }
 
@@ -84,7 +85,7 @@ void	dispchar(char ch) {
 #include "../zipos/kfildes.h"
 void	display_task(void) {
 	while(1) {
-		int	ch;
+		char	ch;
 		read(FILENO_STDIN, &ch, 1);
 		dispchar(ch);
 	}
