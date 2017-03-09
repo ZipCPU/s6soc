@@ -104,6 +104,7 @@ void	skip_bitfile_header(FILE *fp) {
 int main(int argc, char **argv) {
 	int		skp=0, argn;
 	bool		debug_only = false, verbose = false;
+	bool		ignore_missing_memory = false;
 	unsigned	entry = 0;
 	FLASHDRVR	*flash = NULL;
 	const char	*bitfile = NULL, *altbitfile = NULL, *execfile = NULL;
@@ -299,7 +300,8 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 			if (!valid) {
 				fprintf(stderr, "No such memory on board: 0x%08x - %08x\n",
 					secp->m_start, secp->m_start+secp->m_len);
-				exit(EXIT_FAILURE);
+				if (!ignore_missing_memory)
+					exit(EXIT_FAILURE);
 			}
 		}
 
@@ -307,17 +309,33 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 		for(int i=0; secpp[i]->m_len; i++) {
 			secp = secpp[i];
 
+			unsigned start, idx, ln;
+
+			start = secp->m_start;
+			idx = 0;
+			ln = secp->m_len;
+			if (secp->m_start < SPIFLASH) {
+				start = SPIFLASH;
+				idx = SPIFLASH-secp->m_start;
+				if (idx > secp->m_len)
+					continue;
+				ln = secp->m_len-idx;
+			} if (start + ln > SPIFLASH+FLASHLEN) {
+				if (start > SPIFLASH+FLASHLEN)
+					continue;
+				ln = SPIFLASH+FLASHLEN-start;
+			}
+
 			// We only ever write to the flash
-				if (secp->m_start < startaddr) {
-					// Keep track of the first address in
-					// flash, as well as the last address
-					// that we will write
-					codelen += (startaddr-secp->m_start);
-					startaddr = secp->m_start;
-				} if (secp->m_start+secp->m_len > startaddr+codelen) {
-					codelen = secp->m_start+secp->m_len-startaddr;
-				} memcpy(&fbuf[secp->m_start-SPIFLASH],
-					secp->m_data, secp->m_len);
+			if (start < startaddr) {
+				// Keep track of the first address in
+				// flash, as well as the last address
+				// that we will write
+				codelen += (startaddr-secp->m_start);
+				startaddr = secp->m_start;
+			} if (start+ln > startaddr+codelen) {
+				codelen = secp->m_start+secp->m_len-startaddr;
+			} memcpy(&fbuf[start-SPIFLASH], &secp->m_data[idx], ln);
 		}
 		if ((flash)&&(!flash->write(startaddr, codelen, &fbuf[startaddr-SPIFLASH], true))) {
 			fprintf(stderr, "ERR: Could not write program to flash\n");
