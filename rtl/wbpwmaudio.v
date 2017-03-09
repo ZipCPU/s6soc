@@ -87,6 +87,7 @@ module	wbpwmaudio(i_clk,
 			NAUX=2, // Dev control values
 			VARIABLE_RATE=0,
 			TIMING_BITS=16;
+	localparam [0:0]	BITREVERSE=1;
 	input	i_clk;
 	input	i_wb_cyc, i_wb_stb, i_wb_we;
 	input		i_wb_addr;
@@ -164,7 +165,7 @@ module	wbpwmaudio(i_clk,
 	genvar	k;
 	generate for(k=0; k<16; k=k+1)
 	begin : bit_reversal_loop
-		assign br_counter[k] = pwm_counter[15-k];
+		assign br_counter[k] = (BITREVERSE)?pwm_counter[15-k]:pwm_counter[k];
 	end endgenerate
 
 	always @(posedge i_clk)
