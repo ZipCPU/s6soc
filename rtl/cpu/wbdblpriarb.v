@@ -57,7 +57,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -68,7 +68,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module	wbdblpriarb(i_clk, i_rst, 
+module	wbdblpriarb(i_clk, i_rst,
 	// Bus A
 	i_a_cyc_a,i_a_cyc_b,i_a_stb_a,i_a_stb_b,i_a_we,i_a_adr, i_a_dat, i_a_sel, o_a_ack, o_a_stall, o_a_err,
 	// Bus B
@@ -128,6 +128,7 @@ module	wbdblpriarb(i_clk, i_rst,
 	// zeroing things on idle can make them stand out all the more when
 	// staring at wires and dumps and such.
 	//
+	wire	o_cyc, o_stb;
 	assign	o_cyc = ((o_cyc_a)||(o_cyc_b));
 	assign	o_stb = (o_cyc)&&((o_stb_a)||(o_stb_b));
 	assign o_stb_a = (r_a_owner) ? (i_a_stb_a)&&(o_cyc_a) : (i_b_stb_a)&&(o_cyc_a);
