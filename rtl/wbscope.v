@@ -194,7 +194,8 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	// Determine when memory is full and capture is complete
 	//
 	// Writes take place on the data clock
-	reg	[(HOLDOFFBITS-1):0]	counter;	// This is unsigned
+	// The counter is unsigned
+	(* ASYNC_REG="TRUE" *) reg	[(HOLDOFFBITS-1):0]	counter;
 	reg	less_than_holdoff;
 	always @(posedge i_clk)
 		if (dw_reset)
@@ -203,24 +204,22 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 			less_than_holdoff <= (counter < bw_holdoff);
 
 	reg		dr_stopped;
-	(* ASYNC_REG="TRUE" *) reg	[19:0]	counter;// This is unsigned
 	initial	dr_stopped = 1'b0;
 	initial	counter = 0;
 	always @(posedge i_clk)
 		if (dw_reset)
-		begin
 			counter <= 0;
 		else if ((i_ce)&&(dr_triggered)&&(~dr_stopped))
 		begin // MUST BE a < and not <=, so that we can keep this w/in
 			// 20 bits.  Else we'd need to add a bit to comparison 
 			// here.
-			counter <= counter + 20'h01;
+			counter <= counter + 1'b1;
 		end
 	always @(posedge i_clk)
 		if ((~dr_triggered)||(dw_reset))
 			dr_stopped <= 1'b0;
 		else if (i_ce)
-			dr_stopped <= (counter+20'd1 >= bw_holdoff);
+			dr_stopped <= (counter+1'b1 >= bw_holdoff);
 		else
 			dr_stopped <= (counter >= bw_holdoff);
 
