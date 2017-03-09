@@ -782,7 +782,10 @@ module	zipcpu(i_clk, i_rst, i_interrupt,
 		else if ((wr_reg_ce)&&(op_Bid == wr_reg_id)&&(op_rB))
 			r_op_Bv <= wr_gpreg_vl;
 `else
-		r_op_Bv <= w_op_BnI + dcd_I;
+		if ((dcd_Bpc)&&(dcd_rB))
+			r_op_Bv <= w_pcB_v + { dcd_I[29:0], 2'b00 };
+		else
+			r_op_Bv <= w_op_BnI + dcd_I;
 `endif
 
 	// The logic here has become more complex than it should be, no thanks
@@ -2003,7 +2006,7 @@ module	zipcpu(i_clk, i_rst, i_interrupt,
 					o_wb_addr[8:0] }
 					: { pf_instruction[31:21] },
 			pf_valid, (pf_valid) ? alu_pc[14:0]
-				:{ pf_cyc, pf_stb, pf_pc[12:0] }
+				:{ pf_cyc, pf_stb, pf_pc[14:2] }
 
 		/*
 			i_wb_err, gie, new_pc, dcd_early_branch,	// 4
