@@ -55,6 +55,7 @@
 module	idecode(i_clk, i_rst, i_ce, i_stalled,
 		i_instruction, i_gie, i_pc, i_pf_valid,
 			i_illegal,
+		o_valid,
 		o_phase, o_illegal,
 		o_pc, o_gie,
 		o_dcdR, o_dcdA, o_dcdB, o_I, o_zI,
@@ -72,7 +73,7 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	input			i_gie;
 	input	[(AW-1):0]	i_pc;
 	input			i_pf_valid, i_illegal;
-	output	wire		o_phase;
+	output	wire		o_valid, o_phase;
 	output	reg		o_illegal;
 	output	reg	[AW:0]	o_pc;
 	output	reg		o_gie;
@@ -111,7 +112,7 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	wire		w_dcdA_pc, w_dcdA_cc;
 	wire		w_dcdB_pc, w_dcdB_cc;
 	wire	[3:0]	w_cond;
-	wire		w_wF, w_mem, w_sto, w_lod, w_div, w_fpu;
+	wire		w_wF, w_mem, w_sto, w_div, w_fpu;
 	wire		w_wR, w_rA, w_rB, w_wR_n;
 	wire		w_ljmp, w_ljmp_dly, w_cis_ljmp;
 	wire	[31:0]	iword;
@@ -252,7 +253,6 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	// 1 LUT
 	assign	w_mem    = (w_cis_op[4:3] == 2'b10)&&(w_cis_op[2:1] !=2'b00);
 	assign	w_sto     = (w_mem)&&( w_cis_op[0]);
-	assign	w_lod     = (w_mem)&&(!w_cis_op[0]);
 	// 1 LUT
 	assign	w_div     = (!iword[31])&&(w_op[4:1] == 4'h7);
 	// 2 LUTs
@@ -403,12 +403,16 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 			if (!o_phase)
 				o_gie<= i_gie;
 
-			if ((iword[31])&&(!o_phase))
-				o_pc <= { i_pc, 1'b1 };
-			else if ((iword[31])&&(i_pf_valid))
-				o_pc <= { i_pc, 1'b0 };
-			else
+			if (iword[31])
+			begin
+				if (o_phase)
+					o_pc <= o_pc + 1'b1;
+				else if (i_pf_valid)
+					o_pc <= { i_pc, 1'b1 };
+			end else begin
+				// The normal, non-CIS case
 				o_pc <= { i_pc + 1'b1, 1'b0 };
+			end
 `else
 			o_gie<= i_gie;
 			o_pc <= { i_pc + 1'b1, 1'b0 };
@@ -588,12 +592,13 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	always @(posedge i_clk)
 		if (i_rst)
 			r_valid <= 1'b0;
-		else if ((i_ce)&&(o_ljmp))
+		else if (i_ce)
+			r_valid <= ((i_pf_valid)||(o_phase)||(i_illegal))
+					&&(!o_ljmp)&&(!o_early_branch);
+		else if (!i_stalled)
 			r_valid <= 1'b0;
-		else if ((i_ce)&&(i_pf_valid))
-			r_valid <= 1'b1;
-		else if (~i_stalled)
-			r_valid <= 1'b0;
+
+	assign	o_valid = r_valid;
 
 
 	assign	o_I = { {(32-22){r_I[22]}}, r_I[21:0] };
