@@ -41,7 +41,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -108,7 +108,7 @@
 //
 //
 // OPT_IMPLEMENT_FPU will (one day) control whether or not the floating point
-// unit (once I have one) is built and included into the ZipCPU by default. 
+// unit (once I have one) is built and included into the ZipCPU by default.
 // At that time, if this option is set then a parameter will be set that
 // causes the floating point unit to be included.  (This parameter may
 // still be overridden, as with any parameter ...)  If the floating point unit
@@ -122,36 +122,11 @@
 //
 //
 //
-// The instruction set defines an optional compressed instruction set (CIS)
-// complement.  These were at one time erroneously called Very Long Instruction
-// Words.  They are more appropriately referred to as compressed instructions.
-// The compressed instruction format allows two instructions to be packed into
-// the same instruction word.  Some instructions can be compressed, not all.
-// Compressed instructions take the same time to complete.  Set OPT_CIS to
-// include these double instructions as part of the instruction set.  These
-// instructions are designed to get more code density from the instruction set,
-// and to hopefully take some pain off of the performance of the pre-fetch and
-// instruction cache.
-//
-// These new instructions, however, also necessitate a change in the Zip
-// CPU--the Zip CPU can no longer execute instructions atomically.  It must
-// now execute non-CIS instructions, or CIS instruction pairs, atomically. 
-// This logic has been added into the ZipCPU, but it has not (yet) been
-// tested thoroughly.
-//
-// Oh, and the debugger and the simulator also need to be updated as well
-// to properly handle these.
-//
-// `define OPT_CIS	// Adds about 80 LUTs on a Spartan 6
-//
-//
-//
-//
-// OPT_SINGLE_FETCH controls whether or not the prefetch has a cache, and 
+// OPT_SINGLE_FETCH controls whether or not the prefetch has a cache, and
 // whether or not it can issue one instruction per clock.  When set, the
 // prefetch has no cache, and only one instruction is fetched at a time.
-// This effectively sets the CPU so that only one instruction is ever 
-// in the pipeline at once, and hence you may think of this as a "kill 
+// This effectively sets the CPU so that only one instruction is ever
+// in the pipeline at once, and hence you may think of this as a "kill
 // pipeline" option.  However, since the pipelined fetch component uses so
 // much area on the FPGA, this is an important option to use in trimming down
 // used area if necessary.  Hence, it needs to be maintained for that purpose.
@@ -160,7 +135,7 @@
 //
 // We can either pipeline our fetches, or issue one fetch at a time.  Pipelined
 // fetches are more complicated and therefore use more FPGA resources, while
-// single fetches will cause the CPU to stall for about 5 stalls each 
+// single fetches will cause the CPU to stall for about 5 stalls each
 // instruction cycle, effectively reducing the instruction count per clock to
 // about 0.2.  However, the area cost may be worth it.  Consider:
 //
@@ -172,7 +147,58 @@
 // I recommend only defining this if you "need" to, if area is tight and
 // speed isn't as important.  Otherwise, just leave this undefined.
 //
-`define	OPT_SINGLE_FETCH
+// `define	OPT_SINGLE_FETCH	// 2228 total LUTs
+//
+//
+// OPT_DOUBLE_FETCH is an alternative to OPT_SINGLE_FETCH.  It is designed to
+// increase performance primarily when using an instruction memory which has
+// one cost for a random access, and a second (lower) cost for sequential
+// access.  The driving example behind this implementation was flash memory
+// with 34 clocks for an initial access and 16 clocks for any subsequent access,
+// but SDRAM memory with 27 clocks for an initial access and 1 clock for a
+// subsequent access is also a good example.  Even block RAM might be a good
+// example, if there were any bus delays in getting to the RAM device.  Using
+// OPT_DOUBLE_FETCH also increases the pipeline speed, as it allows CIS
+// instructions and therefore partial pipelining.  (No work is done to resolve
+// pipeline conflicts past the decode stage, as is the case with full pipeline
+// mode.
+//
+// Do not define OPT_DOUBLE_FETCH if you wish to fully pipeline the CPU.  Do
+// not define both OPT_DOUBLE_FETCH and OPT_SINGLE_FETCH (the ifndef below
+// should prevent that).
+//
+//
+`ifndef	OPT_SINGLE_FETCH
+`define	OPT_DOUBLE_FETCH	// COST: about 79 LUTs over the SINGLE_FETCH
+`endif
+//
+//
+//
+// The ZipCPU ISA defines an optional compressed instruction set (CIS)
+// complement.  This compressed instruction format allows two instructions to
+// be packed into the same instruction word.  Some instructions can be so
+// compressed, although not all.  Compressed instructions take the same time to
+// complete--they are just compressed within memory to spare troubles with the
+// prefetch.  Set OPT_CIS to include these compressed instructions as part of
+// the instruction set.
+//
+`define OPT_CIS		// COST: about 87 LUTs
+//
+//
+//
+//
+// OPT_EARLY_BRANCHING is an attempt to execute a BRA statement as early
+// as possible, to avoid as many pipeline stalls on a branch as possible.
+// With the OPT_TRADITIONAL_PFCACHE, BRA instructions cost only a single
+// extra stall cycle, while LJMP instructions cost two (assuming the target is
+// in the cache).  Indeed, the result is that a BRA instruction can be used as
+// the compiler's branch prediction optimizer: BRA's barely stall, while
+// conditional branches will always suffer about 4 stall cycles or so.
+//
+// I recommend setting this flag, so as to turn early branching on.
+//
+// `define	OPT_EARLY_BRANCHING
+//
 //
 //
 //
@@ -182,12 +208,13 @@
 // is not defined).
 //
 `ifndef	OPT_SINGLE_FETCH
+`ifndef	OPT_DOUBLE_FETCH
 //
 //
 //
-// OPT_PIPELINED is the natural result and opposite of using the single 
+// OPT_PIPELINED is the natural result and opposite of using the single
 // instruction fetch unit.  If you are not using that unit, the ZipCPU will
-// be pipelined.  The option is defined here more for readability than 
+// be pipelined.  The option is defined here more for readability than
 // anything else, since OPT_PIPELINED makes more sense than OPT_SINGLE_FETCH,
 // well ... that and it does a better job of explaining what is going on.
 //
@@ -210,20 +237,6 @@
 //
 //
 //
-// OPT_EARLY_BRANCHING is an attempt to execute a BRA statement as early
-// as possible, to avoid as many pipeline stalls on a branch as possible.
-// It's not tremendously successful yet--BRA's still suffer stalls,
-// but I intend to keep working on this approach until the number of stalls
-// gets down to one or (ideally) zero.  (With the OPT_TRADITIONAL_PFCACHE, this
-// gets down to a single stall cycle ...)  That way a "BRA" can be used as the
-// compiler's branch prediction optimizer: BRA's barely stall, while branches
-// on conditions will always suffer about 4 stall cycles or so.
-//
-// I recommend setting this flag, so as to turn early branching on.
-//
-`define	OPT_EARLY_BRANCHING
-//
-//
 //
 // OPT_PIPELINED_BUS_ACCESS controls whether or not LOD/STO instructions
 // can take advantaged of pipelined bus instructions.  To be eligible, the
@@ -243,8 +256,7 @@
 //
 //
 //
-//
-//
+`endif	// OPT_DOUBLE_FETCH
 `endif	// OPT_SINGLE_FETCH
 //
 //
