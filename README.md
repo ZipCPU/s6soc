@@ -1,7 +1,7 @@
 # Description
 
 This CMOD-S6 SoC grew out of the desire to demonstrate that a useful ZipCPU
-soft core implementation could be made in a very small space.  In 
+soft core implementation could be made in a very small space.  In
 particular, one of the purposes of the ZipCPU was to be able to operate successfully in a very area-challenged environment.  The CMOD-S6, as sold by Digilent
 Inc., provides this environment for this project.
 
@@ -14,7 +14,7 @@ designed as a RISC load/store architecture, having a full set of thirty-two
 wishbone bus for both instructions and data (Von Neumann architecture).  The
 particular implementation of the ZipCPU used for this SoC project is not
 pipelined, nor does it have either instruction or data caches--they simply
-wouldn't fit within the FPGA.  Still, a CPU is a CPU and this CPU will 
+wouldn't fit within the FPGA.  Still, a CPU is a CPU and this CPU will
 execute the instructions given to it faithfully.
 
 # Peripherals
@@ -65,3 +65,10 @@ questions, or even suggestions.
 
 20170309: All of the prior ZipOS functionality now works (again) using the new ZipCPU.
 
+# Commercial Applications
+
+Because this design is very small, it can easily be included into a larger
+design with minimal impact to that design.
+
+Should you find the GPLv3 license insufficient for your needs, other licenses
+can be purchased from Gisselquist Technology, LLC.
