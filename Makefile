@@ -39,15 +39,13 @@
 ##
 .PHONY: all
 all:	datestamp archive rtl sw
-# BENCH := `find bench -name Makefile` `find bench -name "*.cpp"` `find bench -name "*.h"`
 BENCH :=
+SIM := `find sim -name Makefile` `find sim -name "*.cpp"` `find sim -name "*.h"`
 RTL   := `find rtl -name "*.v"` `find rtl -name Makefile`
 NOTES := `find doc -name "*.txt"` `find doc -name "*.html"` `ls *.txt`
 SW    := `find sw -name "*.cpp"` `find sw -name "*.h"`	\
 	`find sw -name "*.c"` `find sw -name "*.sh"`	\
 	`find sw -name "*.pl"` `find sw -name Makefile`
-# PROJ  := xilinx/xula.prj xilinx/xula.xise xilinx/xula.xst	\
-#	xilinx/xula.ut xilinx/Makefile
 PROJ	:=
 BIN	:= `find xilinx -name "*.bit"`
 CONSTRAINTS := cmod.ucf
@@ -70,9 +68,9 @@ sw:
 doc:
 	@make --no-print-directory -C doc
 
-.PHONY: bench
+.PHONY: sim
 bench: rtl
-	@make --no-print-directory -C bench/cpp
+	@make --no-print-directory -C sim/verilator
 
 .PHONY: list-archive-rtl
 list-archive-rtl:
@@ -99,7 +97,7 @@ list-archive: list-archive-sw list-archive-rtl list-archive-notes list-archive-p
 
 .PHONY: archive
 archive:
-	tar --transform s,^,$(YYMMDD)-s6/, -chjf $(YYMMDD)-s6.tjz $(BENCH) $(SW) $(RTL) $(NOTES) $(PROJ) $(BIN) $(CONSTRAINTS)
+	tar --transform s,^,$(YYMMDD)-s6/, -chjf $(YYMMDD)-s6.tjz $(SIM) $(BENCH) $(SW) $(RTL) $(NOTES) $(PROJ) $(BIN) $(CONSTRAINTS)
 
 # .PHONY: bit
 # bit:

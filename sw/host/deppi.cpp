@@ -124,13 +124,14 @@ DEPPI::DEPPI(const char *szSel) {
 }
 
 DEPPI::~DEPPI(void) {
-	close();
+	DEPPI::close();
 }
 
 void	DEPPI::close(void) {
 	if (m_dev)
 		DmgrClose(m_dev);
 	m_dev = 0;
+	LLCOMMSI::close();
 }
 
 void	DEPPI::depperr(void) {
