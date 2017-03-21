@@ -48,6 +48,7 @@
 #include "ktraps.h"
 #include "errno.h"
 #include "swint.h"
+#include "txfns.h"
 
 extern	void	kpanic(void);
 extern	void	raw_put_uart(int val);
@@ -74,6 +75,8 @@ int	LAST_TASK;
 
 extern void txstr(const char *);
 
+#define	SET_WATCHDOG	_watchdog = (CONTEXT_LENGTH*2)
+
 void	kernel_entry(void) {
 	int	nheartbeats= 0, tickcount = 0, milliseconds=0, ticks = 0;
 	int	audiostate = 0, buttonstate = 0;
@@ -97,12 +100,13 @@ void	kernel_entry(void) {
 	// Then selectively turn some of them back on
 	_sys->io_pic = INT_ENABLE | enableset | 0x07fff;
 
-	txstr("HEAP: "); txhex(heap);
+	txstr("HEAP: "); txhex((int)heap);
 
 	do {
 		int need_resched = 0, context_has_been_saved, pic;
 		nheartbeats++;
 
+		SET_WATCHDOG;
 		zip_rtu();
 
 		last_context = current->context;

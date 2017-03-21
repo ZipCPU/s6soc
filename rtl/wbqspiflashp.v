@@ -8,7 +8,7 @@
 //		provides a writable interface to the flash whereas the other
 //	is configured to be read only.
 //
-// Creator:	Dan Gisselquist
+// Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////

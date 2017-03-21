@@ -2,6 +2,8 @@ xilinx/
 obj_dir/
 obj-pc/
 obj-zip/
+*.vcd
 *.swp
+cpudefs.h
 tags
 zip_sim

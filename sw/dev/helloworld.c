@@ -46,7 +46,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "asmstartup.h"
 #include "board.h"
 
 const char msg[] = "Hello, world!\r\n";
@@ -55,7 +54,12 @@ void entry(void) {
 	volatile IOSPACE *const sys = (IOSPACE *)IOADDR;
 	int	ledset = 0;
 
-	sys->io_spio = 0x0f0;
+	sys->io_pic  = 0x07fffffff; // Acknowledge and turn off all ints
+
+// sys->io_watchdog = TM_ONE_SECOND * 2;
+_scope->s_ctrl = 2 | WBSCOPE_NO_RESET;
+
+	sys->io_spio = 0x0fc;
 
 	/// Turn off timer B
 	sys->io_watchdog = 0;
@@ -64,6 +68,7 @@ void entry(void) {
 		const char	*ptr;
 		sys->io_timer = TM_ONE_SECOND; // Ticks per second, 80M
 		sys->io_pic  = 0x07fffffff; // Acknowledge and turn off all ints
+		sys->io_pic  = INT_ENABLEV(INT_BUTTON);
 
 		ptr = msg;
 		while(*ptr) {
@@ -72,6 +77,7 @@ void entry(void) {
 			// Wait while our transmitter is busy
 			while((sys->io_pic & INT_UARTTX)==0)
 				;
+
 			sys->io_uart = iv; // Transmit our character
 			sys->io_pic  = INT_UARTTX; // Clear the int flag
 		}
@@ -93,6 +99,7 @@ void entry(void) {
 			sys->io_spio = ledset&0x0f5;
 		else
 			sys->io_spio = ledset;
+sys->io_watchdog = 0;
 	}
 }
 

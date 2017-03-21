@@ -50,7 +50,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-#include "asmstartup.h"
 #include "board.h"
 #include "rtcsim.h"
 #include "display.h"
@@ -58,8 +57,6 @@
 #include "txfns.h"
 
 #include "samples.c"
-
-void	zip_halt(void);
 
 void	build_dpymsg(char *msg, unsigned clkval);
 void	build_uartmsg(char *msg, unsigned clkval);

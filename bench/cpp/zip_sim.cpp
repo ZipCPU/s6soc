@@ -24,7 +24,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -45,6 +45,7 @@
 #include <stdint.h>
 
 #include "verilated.h"
+#include "cpudefs.h"
 #include "Vbusmaster.h"
 
 #include "regdefs.h"
@@ -67,11 +68,15 @@ public:
 	unsigned operator()(const unsigned o_kpd) { return 0; }
 };
 
+#define	LOWLOGIC_FLASH
+#define	USE_LITE_UART
+
 #define	tx_busy		v__DOT__tcvuart__DOT__r_busy
 #define	rx_stb		v__DOT__rx_stb
 #define	uart_setup	v__DOT__tcvuart__DOT__r_setup
 #define	cpu_regset	v__DOT__swic__DOT__thecpu__DOT__regset
 #define	cpu_gie		v__DOT__swic__DOT__thecpu__DOT__r_gie
+#define	cpu_new_pc	v__DOT__swic__DOT__thecpu__DOT__new_pc
 #define	cpu_ipc		v__DOT__swic__DOT__thecpu__DOT__ipc
 #define	cpu_upc		v__DOT__swic__DOT__thecpu__DOT__r_upc
 #define	cpu_op_Av	v__DOT__swic__DOT__thecpu__DOT__r_op_Av
@@ -80,12 +85,23 @@ public:
 #define	cpu_uflags	v__DOT__swic__DOT__thecpu__DOT__w_uflags
 #define	cpu_pf_valid	v__DOT__swic__DOT__thecpu__DOT__pf_valid
 #define	cpu_pf_pc	v__DOT__swic__DOT__thecpu__DOT__pf_pc
+#ifdef	OPT_SINGLE_FETCH
+#define	cpu_pf_instruction_pc	v__DOT__swic__DOT__thecpu__DOT__pf_addr
+#else
 #define	cpu_pf_instruction_pc	v__DOT__swic__DOT__thecpu__DOT__pf_instruction_pc
+#endif
 #define	cpu_pf_instruction	v__DOT__swic__DOT__thecpu__DOT__pf_instruction
+#define	cpu_dcd_valid	v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__r_valid
+#define	cpu_dcd_iword	v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__iword
 #define	cpu_op_valid	v__DOT__swic__DOT__thecpu__DOT__op_valid
 #define	cpu_op_sim	v__DOT__swic__DOT__thecpu__DOT__op_sim
 #define	cpu_sim_immv	v__DOT__swic__DOT__thecpu__DOT__op_sim_immv
+#define	cpu_dcd_ce	v__DOT__swic__DOT__thecpu__DOT__dcd_ce
 #define	cpu_alu_ce	v__DOT__swic__DOT__thecpu__DOT__alu_ce
+#define	cpu_wr_reg_ce	v__DOT__swic__DOT__thecpu__DOT__wr_reg_ce
+#define	cpu_wr_reg_id	v__DOT__swic__DOT__thecpu__DOT__wr_reg_id
+#define	cpu_wr_gpreg_vl	v__DOT__swic__DOT__thecpu__DOT__wr_gpreg_vl
+#define	cpu_wr_flags_ce	v__DOT__swic__DOT__thecpu__DOT__wr_flags_ce
 //
 #define	pic_gie		v__DOT__pic__DOT__r_gie
 #define	pic_int_enable	v__DOT__pic__DOT__r_int_enable
@@ -112,16 +128,24 @@ public:
 	KEYPADSIM	m_keypad;
 	unsigned	m_last_led;
 	unsigned	m_last_gpio, m_last_pf_pc;
+#ifdef	LOWLOGIC_FLASH
+	unsigned	m_last_qspi_dat;
+#endif
 	time_t		m_start_time;
 	FILE		*m_dbg;
+	int		m_serial_port;
 
-	ZIPSIM_TB(int serial_port, bool debug) : m_uart(serial_port) {
+	ZIPSIM_TB(int serial_port, bool debug) : m_uart(serial_port),
+				m_serial_port(serial_port) {
 		m_start_time = time(NULL);
 		if (debug)
 			m_dbg = fopen("dbg.txt","w");
 		else	m_dbg = NULL;
 
 		m_last_led = m_last_gpio = m_last_pf_pc = -1;
+#ifdef	LOWLOGIC_FLASH
+		m_last_qspi_dat = 15;
+#endif
 	}
 
 	void	reset(void) {
@@ -132,58 +156,54 @@ public:
 		closetrace();
 	}
 
-	void dump(const uint32_t *regp) {
+	void dump(FILE *fp, const uint32_t *regp) {
 		uint32_t	uccv, iccv;
-		fflush(stderr);
-		fflush(stdout);
-		printf("ZIPM--DUMP: ");
+		fprintf(fp,"\nZIPM--DUMP: ");
 		if (m_core->cpu_gie)
-			printf("Interrupts-enabled\n");
+			fprintf(fp, "Interrupts-enabled\n");
 		else
-			printf("Supervisor mode\n");
-		printf("\n");
+			fprintf(fp, "Supervisor mode\n");
+		fprintf(fp, "\n");
 
 		iccv = m_core->cpu_iflags;
 		uccv = m_core->cpu_uflags;
 
-		printf("sR0 : %08x ", regp[0]);
-		printf("sR1 : %08x ", regp[1]);
-		printf("sR2 : %08x ", regp[2]);
-		printf("sR3 : %08x\n",regp[3]);
-		printf("sR4 : %08x ", regp[4]);
-		printf("sR5 : %08x ", regp[5]);
-		printf("sR6 : %08x ", regp[6]);
-		printf("sR7 : %08x\n",regp[7]);
-		printf("sR8 : %08x ", regp[8]);
-		printf("sR9 : %08x ", regp[9]);
-		printf("sR10: %08x ", regp[10]);
-		printf("sR11: %08x\n",regp[11]);
-		printf("sR12: %08x ", regp[12]);
-		printf("sSP : %08x ", regp[13]);
-		printf("sCC : %08x ", iccv);
-		printf("sPC : %08x\n",m_core->cpu_ipc);
+		fprintf(fp, "sR0 : %08x ", regp[0]);
+		fprintf(fp, "sR1 : %08x ", regp[1]);
+		fprintf(fp, "sR2 : %08x ", regp[2]);
+		fprintf(fp, "sR3 : %08x\n",regp[3]);
+		fprintf(fp, "sR4 : %08x ", regp[4]);
+		fprintf(fp, "sR5 : %08x ", regp[5]);
+		fprintf(fp, "sR6 : %08x ", regp[6]);
+		fprintf(fp, "sR7 : %08x\n",regp[7]);
+		fprintf(fp, "sR8 : %08x ", regp[8]);
+		fprintf(fp, "sR9 : %08x ", regp[9]);
+		fprintf(fp, "sR10: %08x ", regp[10]);
+		fprintf(fp, "sR11: %08x\n",regp[11]);
+		fprintf(fp, "sR12: %08x ", regp[12]);
+		fprintf(fp, "sSP : %08x ", regp[13]);
+		fprintf(fp, "sCC : %08x ", iccv);
+		fprintf(fp, "sPC : %08x\n",m_core->cpu_ipc);
 
-		printf("\n");
+		fprintf(fp, "\n");
 
-		printf("uR0 : %08x ", regp[16]);
-		printf("uR1 : %08x ", regp[17]);
-		printf("uR2 : %08x ", regp[18]);
-		printf("uR3 : %08x\n",regp[19]);
-		printf("uR4 : %08x ", regp[20]);
-		printf("uR5 : %08x ", regp[21]);
-		printf("uR6 : %08x ", regp[22]);
-		printf("uR7 : %08x\n",regp[23]);
-		printf("uR8 : %08x ", regp[24]);
-		printf("uR9 : %08x ", regp[25]);
-		printf("uR10: %08x ", regp[26]);
-		printf("uR11: %08x\n",regp[27]);
-		printf("uR12: %08x ", regp[28]);
-		printf("uSP : %08x ", regp[29]);
-		printf("uCC : %08x ", uccv);
-		printf("uPC : %08x\n",m_core->cpu_upc);
-		printf("\n");
-		fflush(stderr);
-		fflush(stdout);
+		fprintf(fp, "uR0 : %08x ", regp[16]);
+		fprintf(fp, "uR1 : %08x ", regp[17]);
+		fprintf(fp, "uR2 : %08x ", regp[18]);
+		fprintf(fp, "uR3 : %08x\n",regp[19]);
+		fprintf(fp, "uR4 : %08x ", regp[20]);
+		fprintf(fp, "uR5 : %08x ", regp[21]);
+		fprintf(fp, "uR6 : %08x ", regp[22]);
+		fprintf(fp, "uR7 : %08x\n",regp[23]);
+		fprintf(fp, "uR8 : %08x ", regp[24]);
+		fprintf(fp, "uR9 : %08x ", regp[25]);
+		fprintf(fp, "uR10: %08x ", regp[26]);
+		fprintf(fp, "uR11: %08x\n",regp[27]);
+		fprintf(fp, "uR12: %08x ", regp[28]);
+		fprintf(fp, "uSP : %08x ", regp[29]);
+		fprintf(fp, "uCC : %08x ", uccv);
+		fprintf(fp, "uPC : %08x\n",m_core->cpu_upc);
+		fprintf(fp,"\n");
 	}
 
 	void	execsim(const uint32_t imm) {
@@ -220,28 +240,46 @@ public:
 		} else if ((imm & 0x0fffff)==0x002ff) {
 			// Full/unconditional dump
 			printf("SIM-DUMP\n");
-			dump(regp);
+			dump(stdout, regp);
+			if ((m_dbg)&&(m_dbg != stdout)) {
+				fprintf(m_dbg, "SIM-DUMP\n");
+				dump(m_dbg, regp);
+			}
 		} else if ((imm & 0x0ffff0)==0x00200) {
 			// Dump a register
 			int rid = (imm&0x0f)+rbase;
 			printf("%8ld @%08x R[%2d] = 0x%08x\n", m_tickcount,
 				m_core->cpu_ipc, rid, regp[rid]);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "%8ld @%08x R[%2d] = 0x%08x\n",
+					m_tickcount, m_core->cpu_ipc,
+					rid, regp[rid]);
 		} else if ((imm & 0x0ffff0)==0x00210) {
 			// Dump a user register
 			int rid = (imm&0x0f);
 			printf("%8ld @%08x uR[%2d] = 0x%08x\n", m_tickcount,
 				m_core->cpu_ipc, rid, regp[rid+16]);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "%8ld @%08x uR[%2d] = 0x%08x\n",
+					m_tickcount, m_core->cpu_ipc,
+					rid, regp[rid+16]);
 		} else if ((imm & 0x0ffff0)==0x00230) {
 			// SOUT[User Reg]
 			int rid = (imm&0x0f)+16;
 			printf("%c", regp[rid]&0x0ff);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "NOUT: %c\n", regp[rid]&0x0ff);
 		} else if ((imm & 0x0fffe0)==0x00220) {
 			// SOUT[User Reg]
 			int rid = (imm&0x0f)+rbase;
 			printf("%c", regp[rid]&0x0ff);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "NOUT: %c\n", regp[rid]&0x0ff);
 		} else if ((imm & 0x0fff00)==0x00400) {
 			// SOUT[Imm]
 			printf("%c", imm&0x0ff);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "NOUT: %c\n", imm&0x0ff);
 		} else { // if ((insn & 0x0f7c00000)==0x77800000)
 			uint32_t	immv = imm & 0x03fffff;
 			// Simm instruction that we dont recognize
@@ -249,6 +287,9 @@ public:
 			// printf("SIM 0x%08x\n", immv);
 			printf("SIM 0x%08x (ipc = %08x, upc = %08x)\n", immv,
 				m_core->cpu_ipc, m_core->cpu_upc);
+			if ((m_dbg)&&(m_dbg != stdout))
+				fprintf(m_dbg, "SIM 0x%08x (ipc = %08x, upc = %08x)\n",
+					immv, m_core->cpu_ipc, m_core->cpu_upc);
 		} fflush(stdout);
 	}
 
@@ -258,7 +299,7 @@ public:
 			time_t	nsecs = (time(NULL)-m_start_time);
 			if ((nsecs > 0)&&(ticks_per_second>0)) {
 				ticks_per_second /= (double)nsecs;
-				printf(" ********   %.6f TICKS PER SECOND\n", 
+				printf(" ********   %.6f TICKS PER SECOND\n",
 					ticks_per_second);
 			}
 		}
@@ -266,9 +307,52 @@ public:
 		// Set up the bus before any clock tick
 
 		// We've got the flash to deal with ...
-		m_core->i_qspi_dat = m_flash(m_core->o_qspi_cs_n,
+		int	iqspi;
+#ifdef	LOWLOGIC_FLASH
+		// The toplevel logic creates a one cycle/clock delay.  Emulate
+		// it here.
+		m_core->i_qspi_dat = m_last_qspi_dat;
+		if ((m_core->o_qspi_sck == 3)||(m_core->o_qspi_sck == 0)) {
+			iqspi = m_flash(m_core->o_qspi_cs_n,
+						m_core->o_qspi_sck&1,
+						m_core->o_qspi_dat);
+		} else {
+			iqspi = m_flash(m_core->o_qspi_cs_n,
+						(m_core->o_qspi_sck&2)?1:0,
+						m_core->o_qspi_dat);
+			iqspi = m_flash(m_core->o_qspi_cs_n,
+						(m_core->o_qspi_sck&1)?1:0,
+						m_core->o_qspi_dat);
+		}
+#else
+		// If this assertion fails, we probably meant to define
+		// LOWLOGIC_FLASH, and failed to do so.
+		assert((m_core->o_qspi_sck & ~1)==0);
+		iqspi = m_flash(m_core->o_qspi_cs_n,
 						m_core->o_qspi_sck,
 						m_core->o_qspi_dat);
+#endif
+		if (m_core->o_qspi_mod&2) {
+			// If we are driving the lines, drive the inputs
+			// as well.
+			if (m_core->o_qspi_mod&1)
+				; // 2'b11	// Not driving any lines
+			else	// 2'b10
+				iqspi = m_core->o_qspi_dat;
+		} else {
+			// 2'b0x
+			//
+			// Turn on top two bits (unused in SPI mode)
+			iqspi |= 0xc;
+			// Replace bottom bit with o_qspi_dat[0]
+			iqspi &= 0xe; // Turn off bottom bit
+			iqspi |= m_core->o_qspi_dat&1;
+		}
+#ifndef	LOWLOGIC_FLASH
+		m_core->i_qspi_dat = iqspi;
+#else
+		m_last_qspi_dat = iqspi;
+#endif
 
 		// And the GPIO lines
 		m_core->i_gpio = m_gpio(m_core->o_gpio);
@@ -281,73 +365,103 @@ public:
 
 		// And the UART
 		m_core->i_uart_cts_n = 0;
+#ifdef	USE_LITE_UART
+		m_uart.setup(25);
+#else
 		m_uart.setup(m_core->uart_setup);
+#endif
 		m_core->i_uart  = m_uart(m_core->o_uart);
 
 		TESTB<Vbusmaster>::tick();
 
-		if ((m_core->o_led != m_last_led)||(m_core->o_gpio != m_last_gpio)||(m_core->cpu_pf_pc != m_last_pf_pc)) {
-			printf("LED: %x\tGPIO: %04x\tPF-PC = %08x\r", m_core->o_led,
-					m_core->o_gpio, m_core->cpu_pf_pc);
-			fflush(stdout);
+		if ((m_core->o_led != m_last_led)||(m_core->o_gpio != m_last_gpio)) {
+
+			char	ledstr[80];
+			sprintf(ledstr, "LED: %x\tGPIO: %04x\tPF-PC = %08x",
+				m_core->o_led, m_core->o_gpio,
+				m_core->cpu_pf_pc);
+			if (m_dbg) {
+				printf("%s\n", ledstr);
+				fprintf(m_dbg, "%s\n", ledstr);
+			} else {
+				printf("%s\r", ledstr);
+				fflush(stdout);
+			}
 			m_last_led  = m_core->o_led;
 			m_last_gpio = m_core->o_gpio;
+			m_last_pf_pc = m_core->cpu_pf_pc;
+		} else if ((!m_dbg)&&(m_serial_port != 0)
+				&&(m_last_pf_pc != m_core->cpu_pf_pc)) {
+			char	ledstr[80];
+			sprintf(ledstr, "LED: %x\tGPIO: %04x\tPF-PC = %08x",
+				m_core->o_led, m_core->o_gpio,
+				m_core->cpu_pf_pc);
+			printf("%s\r", ledstr);
+			fflush(stdout);
+
+			m_last_pf_pc = m_core->cpu_pf_pc;
 		}
 
 		if (m_core->watchdog_int) {
 			printf("\nWATCHDOG-INT!!! CPU-sPC = %08x, TICKS = %08lx\n", m_core->cpu_ipc, m_tickcount);
 		}
-		
-		if (m_dbg) fprintf(m_dbg, "%10ld - PC: %08x:%08x [%08x:%08x:%08x:%08x:%08x],%08x,%08x,%d,%08x,%08x (%x,%x/0x%08x)\n",
-			m_tickcount,
-			m_core->cpu_ipc,
-			m_core->cpu_upc,
-			m_core->cpu_regset[0],
-			m_core->cpu_regset[1],
-			m_core->cpu_regset[2],
-			m_core->cpu_regset[3],
-			m_core->cpu_regset[15],
-			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__r_I,
-			m_core->cpu_op_Bv,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__instruction_decoder__DOT__w_dcdR_pc,
-			m_core->cpu_op_Av,
-			m_core->v__DOT__swic__DOT__thecpu__DOT__wr_gpreg_vl,
-			m_core->cpu_iflags,
-			m_core->cpu_uflags,
-			m_core->cpu_pf_pc);
-		if ((!m_core->o_qspi_cs_n)&&(m_dbg))
-			fprintf(m_dbg, "QSPI: [CS,SCK,DAT (MOD)] = %d,%d,%02x,%d -> %04x %7s, state= %x/(%d)\n",
-				m_core->o_qspi_cs_n,
-				m_core->o_qspi_sck,
+
+		if (m_dbg) {
+			fprintf(m_dbg, "%10ld - ", m_tickcount);
+			fprintf(m_dbg, "WB: %s%s%s/%s%s[@0x%08x] %08x->%08x",
+				(m_core->wb_cyc)?"CYC":"   ",
+				(m_core->wb_stb)?"/STB":"    ",
+				(m_core->wb_we )?"W":"R",
+				(m_core->wb_ack)?"ACK":"   ",
+				(m_core->wb_stall)?"STL":"   ",
+				(m_core->wb_addr<<2),
+				(m_core->wb_data),
+				(m_core->wb_idata)
+				);
+
+			fprintf(m_dbg, " CPU: %s%08x:%08x",
+				(m_core->cpu_new_pc)?"NEW-":"    ",
+				m_core->cpu_ipc,
+				m_core->cpu_upc);
+			fprintf(m_dbg, " PF:%08x->%08x@%08x%s",
+				m_core->cpu_pf_pc,
+				m_core->cpu_pf_instruction,
+				(m_core->cpu_pf_instruction_pc*4),
+				(m_core->cpu_pf_valid)?"V":" ");
+			fprintf(m_dbg, " [I=%08x%s%s] OP[%08x,%08x] %s[%02x]%08x %s:%08x/%08x",
+				m_core->cpu_dcd_iword,
+				(m_core->cpu_dcd_valid)?"V":" ",
+				(m_core->cpu_dcd_ce)?"CE":"  ",
+				m_core->cpu_op_Av,
+				m_core->cpu_op_Bv,
+				(m_core->cpu_wr_reg_ce)?"WR":"  ",
+				m_core->cpu_wr_reg_id,
+				m_core->cpu_wr_gpreg_vl,
+				(m_core->cpu_wr_flags_ce)?"WF":"  ",
+				m_core->cpu_iflags,
+				m_core->cpu_uflags);
+
+			// QSPI flash
+			fprintf(m_dbg, "QSPI: %s%s%02x|%d->%02x%6s, state= %x/(%d)",
+				(m_core->o_qspi_cs_n)?"  ":"CS",
+				(m_core->o_qspi_sck)?"CK":"  ",
 				m_core->o_qspi_dat,
 				m_core->o_qspi_mod,
 				m_core->i_qspi_dat,
-				(m_core->v__DOT__flashmem__DOT__quad_mode_enabled)?"(quad)":"",
-				m_core->v__DOT__flashmem__DOT__state,
-				m_core->v__DOT__flashmem__DOT__lldriver__DOT__state);
-
-		if ((m_core->wb_cyc)&&(m_dbg))
-		fprintf(m_dbg, "WB: %s/%s/%s[@0x%08x] %08x ->%s/%s %08x\n", 
-			(m_core->wb_cyc)?"CYC":"   ",
-			(m_core->wb_stb)?"STB":"   ",
-			(m_core->wb_we )?"WE ":"   ",
-			(m_core->wb_addr),
-			(m_core->wb_data),
-			(m_core->wb_ack)?"ACK":"   ",
-			(m_core->wb_stall)?"STL":"   ",
-			(m_core->wb_idata)
+#ifdef	LOWLOGIC_FLASH
+				"(quad)",0,0
+#else
+#define	flash_quad_mode_enabled v__DOT__flashmem__DOT__quad_mode_enabled
+#define	flash_state		v__DOT__flashmem__DOT__state
+#define	flash_llstate		v__DOT__flashmem__DOT__lldriver__DOT__state
+				(m_core->flash_quad_mode_enabled)?"(quad)":"",
+				m_core->flash_state
+				m_core->v__DOT__flashmem__DOT__lldriver__DOT__state
+#endif
 			);
 
-		if ((m_core->cpu_pf_valid)&&(m_dbg))
-			fprintf(m_dbg, "PC: %08x - %08x, uart=%d,%d, pic = %d,%04x,%0d,%04x\n",
-				m_core->cpu_pf_instruction_pc,
-				m_core->cpu_pf_instruction,
-				m_core->rx_stb, m_core->tx_busy,
-				m_core->pic_gie,
-				m_core->pic_int_enable,
-				m_core->pic_any,
-				m_core->pic_int_state);
-
+			fprintf(m_dbg, "\n");
+		}
 
 // SIM instruction(s)
 		if ((m_core->cpu_op_sim)&&(m_core->cpu_op_valid)

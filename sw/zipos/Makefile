@@ -50,7 +50,8 @@ OBJECTS := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(SOURCES))) $(DEVOBJS) $(OBJDIR
 HEADERS := $(wildcard *.h) $(subst .c,.h,$(DEVSRCS))
 # CFLAGS  := -O3 -fdump-tree-all -Wall -Wextra -nostdlib -fno-builtin
 # CFLAGS  := -O3 -fdump-rtl-all -DZIPOS -Wall -Wextra -nostdlib -fno-builtin
-CFLAGS  := -I. -I../dev -Os -DZIPOS -Wall -Wextra -nostdlib -fno-builtin -Wa,-nocis
+INCS    := -I. -I../dev
+CFLAGS  := $(INCS) -Os -DZIPOS -Wall -Wextra -nostdlib -fno-builtin -Wa,-nocis
 LDFLAGS := -T cmodram.ld -Wl,-Map,$(OBJDIR)/doorbell.map -nostdlib
 
 all: doorbell
@@ -94,7 +95,7 @@ endef
 
 define	build-depends
 	@echo "Building dependency file(s)"
-	@$(CC) $(CPPFLAGS) -MM $(SOURCES) $(DEVSRCS) > $(OBJDIR)/xdepends.txt
+	@$(CC) $(INCS) -MM $(SOURCES) $(DEVSRCS) > $(OBJDIR)/xdepends.txt
 	@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
 	@rm $(OBJDIR)/xdepends.txt
 endef

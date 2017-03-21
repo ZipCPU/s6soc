@@ -239,6 +239,9 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 		// Figure out what command we've been given
 		if (m_debug) printf("SPI FLASH CMD %02x\n", m_ireg&0x0ff);
 		switch(m_ireg & 0x0ff) {
+		case 0x00: // No command.
+			m_state = QSPIF_NULL;
+			break;
 		case 0x01: // Write status register
 			if (2 !=(m_sreg & 0x203)) {
 				if (m_debug) printf("QSPI: WEL not set, cannot write status reg\n");
@@ -343,7 +346,12 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 		default:
 			printf("QSPI: UNRECOGNIZED SPI FLASH CMD: %02x\n", m_ireg&0x0ff);
 			m_state = QSPIF_INVALID;
-			assert(0 && "Unrecognized command\n");
+			{
+				static	int bomb_timeout = 0;
+				if (bomb_timeout ++ > 2) {
+					assert(0 && "Unrecognized command\n");
+				}
+			}
 			break;
 		}
 	} else if ((0 == (m_count&0x07))&&(m_count != 0)) {
@@ -351,6 +359,9 @@ int	QSPIFLASHSIM::operator()(const int csn, const int sck, const int dat) {
 		switch(m_state) {
 		case QSPIF_IDLE:
 			printf("TOO MANY CLOCKS, SPIF in IDLE\n");
+			break;
+		case QSPIF_NULL:
+			// Ignore any command
 			break;
 		case QSPIF_WRSR:
 			if (m_count == 16) {

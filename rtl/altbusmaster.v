@@ -43,9 +43,10 @@
 //
 // `define	IMPLEMENT_ONCHIP_RAM
 `define	FLASH_ACCESS
-// `define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
+`define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
 // `define	COMPRESSED_SCOPE
 `define	WBUBUS
+// `define	LOWLOGIC_FLASH
 module	altbusmaster(i_clk, i_rst,
 		// DEPP I/O Control
 		i_depp_astb_n, i_depp_dstb_n, i_depp_write_n,
@@ -63,8 +64,8 @@ module	altbusmaster(i_clk, i_rst,
 		o_uart_setup,
 		// GPIO lines
 		i_gpio, o_gpio);
-	parameter	BUS_ADDRESS_WIDTH=23,
-			BAW=BUS_ADDRESS_WIDTH; // 24bits->2,258,23b->2181
+	parameter	BUS_ADDRESS_WIDTH=23;
+	localparam	BAW=BUS_ADDRESS_WIDTH; // 24bits->2,258,23b->2181
 	// 2^14 bytes requires a LGMEMSZ of 14, and 12 address bits ranging from
 	// 0 to 11.  As with many other devices, the wb_cyc line is more for
 	// form than anything else--it is ignored by the memory itself.
@@ -86,7 +87,12 @@ module	altbusmaster(i_clk, i_rst,
 	input			i_tx_busy;
 	output	wire		o_uart_rts_n;
 	// SPI flash control
-	output	wire		o_qspi_cs_n, o_qspi_sck;
+	output	wire		o_qspi_cs_n;
+`ifdef	LOWLOGIC_FLASH
+	output	wire	[1:0]	o_qspi_sck;
+`else	// LOWLOGIC_FLASH
+	output	wire		o_qspi_sck;
+`endif	// LOWLOGIC_FLASH
 	output	wire	[3:0]	o_qspi_dat;
 	input		[3:0]	i_qspi_dat;
 	output	wire	[1:0]	o_qspi_mod;
@@ -173,11 +179,11 @@ module	altbusmaster(i_clk, i_rst,
 	wire	none_sel, many_sel;
 
 	wire	io_sel, flash_sel, flctl_sel, scop_sel, mem_sel;
-	wire	flash_ack, scop_ack, cfg_ack, mem_ack, many_ack;
-	wire	io_stall, flash_stall, scop_stall, cfg_stall, mem_stall;
+	wire	flash_ack, scop_ack, mem_ack, many_ack;
+	wire	io_stall, flash_stall, scop_stall, mem_stall;
 	reg	io_ack;
 
-	wire	[31:0]	flash_data, scop_data, cfg_data, mem_data, pwm_data,
+	wire	[31:0]	flash_data, scop_data, mem_data, pwm_data,
 			spio_data, gpio_data, uart_data;
 	reg	[31:0]	io_data;
 	reg	[(BAW-1):0]	bus_err_addr;
@@ -309,11 +315,16 @@ module	altbusmaster(i_clk, i_rst,
 `else
 	assign	idle_n = 1'b1;
 `endif
-	assign	io_sel   =((idle_n)&&(skipaddr[3:0]==4'h1));
-	assign	scop_sel =((idle_n)&&(skipaddr[3:1]==3'h1)); // = 4'h2
-	assign	flctl_sel= 1'b0; // ((wb_cyc)&&(skipaddr[3:0]==4'h3));
-	assign	mem_sel  =((idle_n)&&(skipaddr[3:2]==2'h1));
-	assign	flash_sel=((idle_n)&&(skipaddr[3]));
+	assign	io_sel   = ((idle_n)&&(skipaddr[3:0]==4'b00_01));
+`ifdef	LOWLOGIC_FLASH
+	assign	scop_sel = ((idle_n)&&(skipaddr[3:1]==3'b00_1)); // = 4'h2
+	assign	flctl_sel= 1'b0; // The lowlogic flash has no control registers
+`else	// LOWLOGIC_FLASH
+	assign	scop_sel = ((idle_n)&&(skipaddr[3:0]==4'b00_10)); // = 4'h2
+	assign	flctl_sel= ((wb_cyc)&&(skipaddr[3:0]==4'b00_11));
+`endif	// LOWLOGIC_FLASH
+	assign	mem_sel  = ((idle_n)&&(skipaddr[3:2]==2'b01));
+	assign	flash_sel= ((idle_n)&&(skipaddr[3]));
 
 	//
 	// none_sel
@@ -505,13 +516,30 @@ module	altbusmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
-	wbqspiflash #(LGFLASHSZ)	flashmem(i_clk,
-		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
+`ifdef	LOWLOGIC_FLASH
+	wire	w_flash_ack;
+	qflashxpress	flashmem(i_clk,
+		wb_cyc,(wb_stb)&&(flash_sel),
+			wb_addr[(LGFLASHSZ-3):0],
+		w_flash_ack, flash_stall, flash_data,
+		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat);
+
+	assign	flash_interrupt = 1'b0;
+	reg	r_flash_ack;
+	initial	r_flash_ack = 1'b0;
+	always @(posedge i_clk)
+		r_flash_ack <= (wb_stb)&&(flctl_sel);
+	assign	flash_ack = (w_flash_ack)||(r_flash_ack);
+`else	// LOWLOGIC_FLASH
+	wbqspiflashp #(LGFLASHSZ)	// Use the writable interface
+		flashmem(i_clk,
+		  wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
 			wb_addr[(LGFLASHSZ-3):0], wb_data,
 		flash_ack, flash_stall, flash_data,
 		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat,
 		flash_interrupt);
-`else
+`endif	// LOWLOGIC_FLASH
+`else	// FLASH_ACCESS
 	reg	r_flash_ack;
 	initial	r_flash_ack = 1'b0;
 	always @(posedge i_clk)
@@ -526,7 +554,7 @@ module	altbusmaster(i_clk, i_rst,
 	assign	o_qspi_cs_n  = 1'b1;
 	assign	o_qspi_mod   = 2'b01;
 	assign	o_qspi_dat   = 4'b1111;
-`endif
+`endif	// FLASH_ACCESS
 
 	//
 	//	ON-CHIP RAM MEMORY ACCESS
@@ -552,36 +580,42 @@ module	altbusmaster(i_clk, i_rst,
 	//
 	//
 	//
-	wire	[31:0]	scop_cfg_data;
-	wire		scop_cfg_ack, scop_cfg_stall, scop_cfg_interrupt;
 `ifdef	DBG_SCOPE
-	wire		scop_cfg_trigger;
-	assign	scop_cfg_trigger = (wb_stb)&&(cfg_sel);
-	wire	scop_trigger = bus_dbg;
+	wire	scop_trigger;
+	// assign scop_trigger = (flash_sel)&&(wb_stb); // bus_dbg;
+	assign scop_trigger = (wb_stb)&&(wb_we)&&(flctl_sel);
+	wire	[31:0]	flash_debug;
+	wire	[1:0]	sck;
+`ifdef	LOWLOGIC_FLASH
+	assign	sck = o_qspi_sck;
+`else	// LOWLOGIC_FLASH
+	assign	sck = { o_qspi_sck, o_qspi_sck };
+`endif	// LOWLOGIC_FLASH
+	assign	flash_debug = {
+			wb_cyc, wb_stb,
+				flash_sel, flctl_sel, flash_ack, flash_stall,
+				o_qspi_cs_n, sck, o_qspi_mod, 1'b0,
+			o_qspi_dat, i_qspi_dat, flash_data[11:0]
+		};
 `ifdef	COMPRESSED_SCOPE
 	wbscopc	#(5'ha)
 `else
 	wbscope	#(5'ha)
 `endif
-	wbcfgscope(i_clk, 1'b1, scop_trigger, bus_debug,
+	thescope(i_clk, 1'b1, scop_trigger, flash_debug,
 		// Wishbone interface
 		i_clk, wb_cyc, (wb_stb)&&(scop_sel),
 				wb_we, wb_addr[0], wb_data,
-			scop_cfg_ack, scop_cfg_stall, scop_cfg_data,
-		scop_cfg_interrupt);
+			scop_ack, scop_stall, scop_data,
+		scop_interrupt);
 `else
-	reg	r_scop_cfg_ack;
+	reg	r_scop_ack;
 	always @(posedge i_clk)
-		r_scop_cfg_ack <= (wb_stb)&&(scop_sel);
-	assign	scop_cfg_ack = r_scop_cfg_ack;
-	assign	scop_cfg_data = 32'h000;
-	assign	scop_cfg_stall= 1'b0;
+		r_scop_ack <= (wb_stb)&&(scop_sel);
+	assign	scop_ack = r_scop_ack;
+	assign	scop_data = 32'h000;
+	assign	scop_stall= 1'b0;
 `endif
-
-	assign	scop_interrupt = scop_cfg_interrupt;
-	assign	scop_ack   = scop_cfg_ack;
-	assign	scop_stall = scop_cfg_stall;
-	assign	scop_data  = scop_cfg_data;
 
 endmodule
 

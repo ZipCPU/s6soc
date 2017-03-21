@@ -49,6 +49,7 @@
 class	QSPIFLASHSIM {
 	typedef	enum {
 		QSPIF_IDLE,
+		QSPIF_NULL,
 		QSPIF_QUAD_READ_IDLE,
 		QSPIF_RDSR,
 		QSPIF_RDCR,

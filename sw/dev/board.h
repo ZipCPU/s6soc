@@ -109,13 +109,32 @@ typedef	struct WBSCOPE_S {
 #define	IOADDR		0x000400
 #define	SCOPEADDR	0x000800
 // #define FCTLADDR	0x000c00 // Flash control, depends upon write capability
-#define	RAMADDR		0x004000
+#define	BKRAM		(void *)0x004000
+#define	FLASH		(void *)0x1000000
+#define	SDRAM		(void *)0
 #define	RAMSZ		(RAMADDR)
-#define	FLASHADDR	0x1000000
-#define	RESET_ADDR	0x1200000
 #define	FLASHSZ		(FLASHADDR)
+#define	MEMLEN		0x04000
+#define	FLASHLEN	0x1000000
+#define	RESET_ADDR	0x1200000
+
+#define	CLOCKFREQHZ	80000000
+#define	CLOCKFREQ_HZ	CLOCKFREQHZ
 
 static	volatile IOSPACE *const _sys   = (IOSPACE *)IOADDR;
+#define	_ZIP_HAS_WBUARTRX
+#define	_uartrx		_sys->io_uart
+#define	_ZIP_HAS_LONELY_UART
+#define	LONELY_UART
+#define	_uart		_sys->io_uart
+
 static	volatile WBSCOPE *const _scope = (WBSCOPE *)SCOPEADDR;
+
+#define	SYSTIMER	_sys->io_timer
+#define	SYSPIC		_sys->io_pic
+
+#define	valid_ram_region(PTR,LN) (((int)(PTR)>=RAMADDR)&&((int)(PTR+LN)<RAMADDR+RAMSZ))
+#define	valid_flash_region(PTR,LN) (((int)(PTR)>=FLASHADDR)&&((int)(PTR+LN)<FLASHADDR+FLASHSZ))
+#define	valid_mem_region(PTR,LN)	((valid_ram_region(PTR,LN))||(valid_flash_region(PTR,LN)))
 
 #endif

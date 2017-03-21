@@ -46,7 +46,7 @@
 ##
 ##
 all:
-PROGRAMS := helloworld doorbell doorbell2 kptest blinky
+PROGRAMS := helloworld doorbell doorbell2 kptest blinky cputest
 all: $(OBJDIR)/ $(PROGRAMS)
 
 
@@ -67,8 +67,10 @@ OBJDRVR := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(DEVDRVR)))
 
 CPPFLAGS := -I../zipos -I.
 DUMPFLAGS := # -fdump-rtl-all
-CFLAGS   := $(CPPFLAGS) $(DUMPFLAGS) -O3 -Wall -Wextra -nostdlib -fno-builtin -Wa,-nocis
+CFLAGS   := $(CPPFLAGS) $(DUMPFLAGS) -O3 -Wall -Wextra -nostdlib -fno-builtin
 LDFLAGS   = -T cmod.ld -Wl,-Map,$(OBJDIR)/$@.map -Wl,--unresolved-symbols=report-all -nostdlib
+STARTUP := resetdump.s
+STARTOBJ:= $(addprefix $(OBJDIR)/,$(subst .s,.o,$(STARTUP)))
 
 $(OBJDIR)/:
 	$(mk-objdir)
@@ -78,9 +80,18 @@ $(OBJDIR)/:
 $(OBJDIR)/%.o: %.c
 	$(mk-objdir)
 	$(CC) $(CFLAGS) -c $< -o $@
+$(OBJDIR)/cputest.o: cputest.c
+	$(mk-objdir)
+	$(CC) $(CFLAGS) -Wa,-nocis -c $< -o $@
+$(OBJDIR)/cputestcis.o: cputest.c
+	$(mk-objdir)
+	$(CC) $(CFLAGS) -Wa,-cis -c $< -o $@
 $(OBJDIR)/%.o: ../zipos/%.c
 	$(mk-objdir)
 	$(CC) $(CFLAGS) -c $< -o $@
+$(OBJDIR)/%.o: %.s
+	$(mk-objdir)
+	$(AS) -nocis $< -o $@
 
 $(OBJDIR)/%.s: %.c
 	$(mk-objdir)
@@ -93,28 +104,34 @@ $(OBJDIR)/%.txt: $(OBJDIR)/%.o
 	$(OBJDUMP) -Dr $< > $@
 
 
-helloworld: $(OBJDIR)/helloworld.o cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/helloworld.o -o $@
+helloworld: $(OBJDIR)/helloworld.o $(STARTOBJ) cmod.ld
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/helloworld.o -o $@
 $(OBJDIR)/helloworld.txt: helloworld
 	$(OBJDUMP) -dr $^ > $@
 
-doorbell: $(OBJDIR)/doorbell.o cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/doorbell.o -o $@
+doorbell: $(OBJDIR)/doorbell.o $(STARTOBJ) cmod.ld
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/doorbell.o -o $@
 
-doorbell2: $(OBJDIR)/doorbell2.o $(OBJDRVR) $(OBJDIR)/string.o cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/doorbell2.o $(OBJDRVR) $(OBJDIR)/string.o -o $@
+doorbell2: $(OBJDIR)/doorbell2.o $(OBJDRVR) $(STARTOBJ) $(OBJDIR)/string.o cmod.ld
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/doorbell2.o $(OBJDRVR) $(OBJDIR)/string.o -o $@
 $(OBJDIR)/doorbell2.txt: doorbell2
 	$(OBJDUMP) -dr $^ > $@
 
 KPSRCS := kptest.c keypad.c txfns.c
 KPOBJS := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(KPSRCS)))
-kptest: $(KPOBJS) cmod.ld
-	$(CC) $(LDFLAGS) $(KPOBJS) -o $@
+kptest: $(KPOBJS) $(STARTOBJ) cmod.ld
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(KPOBJS) -o $@
 $(OBJDIR)/kptest.txt: kptest
 	$(OBJDUMP) -dr $^ > $@
 
 blinky: $(OBJDIR)/blinky.o cmod.ld
-	$(CC) $(LDFLAGS) $(OBJDIR)/blinky.o -o $@
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/blinky.o -o $@
+
+cputest: $(OBJDIR)/cputest.o cmod.ld
+	$(CC) $(LDFLAGS) $(OBJDIR)/cputest.o -o $@
+
+cputestcis: $(OBJDIR)/cputestcis.o cmod.ld
+	$(CC) $(LDFLAGS) $(OBJDIR)/cputestcis.o -o $@
 
 define	mk-objdir
 	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"

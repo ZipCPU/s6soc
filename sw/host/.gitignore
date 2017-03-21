@@ -3,4 +3,5 @@ buildsamples.cpp
 dumpuart
 readflash
 wbregs
+xpflashscop
 zipload

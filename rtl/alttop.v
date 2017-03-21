@@ -43,6 +43,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+// `define	LOWLOGIC_FLASH
 module alttop(i_clk_8mhz,
 		o_qspi_cs_n, o_qspi_sck, io_qspi_dat,
 		i_btn, o_led, o_pwm, o_pwm_shutdown_n, o_pwm_gain,
@@ -89,7 +90,7 @@ module alttop(i_clk_8mhz,
 	//
 	//	Generate a usable clock for the rest of the board to run at.
 	//
-	wire	ck_zero_0, clk_s;
+	wire	ck_zero_0, clk_s, clk_sn;
 
 	// Clock frequency = (20 / 2) * 8Mhz = 80 MHz
 	// Clock period = 12.5 ns
@@ -110,6 +111,7 @@ module alttop(i_clk_8mhz,
 		.CLK0(ck_zero_0),
 		.CLKFB(ck_zero_0),
 		.CLKFX(clk_s),
+		.CLKFX180(clk_sn),
 		.PSEN(1'b0),
 		.RST(1'b0));
 
@@ -126,7 +128,7 @@ module alttop(i_clk_8mhz,
 	wire		tx_busy;
 	wire	[29:0]	uart_setup;
 
-	// Baud rate is set by clock rate / baud rate desired.  Thus, 
+	// Baud rate is set by clock rate / baud rate desired.  Thus,
 	// 80 MHz / 9600 Baud = 8333, or about 0x208d.  We choose a slow
 	// speed such as 9600 Baud to help the CPU keep up with the serial
 	// port rate.
@@ -159,6 +161,12 @@ module alttop(i_clk_8mhz,
 	//	This is an alternate version of the busmaster interface,
 	//	offering no ZipCPU and access to reprogramming via the flash.
 	//
+`ifdef	LOWLOGIC_FLASH
+	wire	[1:0]	qspi_sck;
+`else
+	wire		qspi_sck;
+`endif
+	wire		qspi_cs_n;
 	wire	[3:0]	qspi_dat;
 	wire	[1:0]	qspi_bmod;
 	wire	[15:0]	w_gpio;
@@ -174,7 +182,7 @@ module alttop(i_clk_8mhz,
 		// External UART interface
 		rx_stb, rx_data, tx_stb, tx_data, tx_busy, w_uart_rts_n,
 		// SPI/SD-card flash
-		o_qspi_cs_n, o_qspi_sck, qspi_dat, io_qspi_dat, qspi_bmod,
+		qspi_cs_n, qspi_sck, qspi_dat, io_qspi_dat, qspi_bmod,
 		// Board lights and switches
 		i_btn, o_led, o_pwm, { o_pwm_shutdown_n, o_pwm_gain },
 		// Keypad connections
@@ -195,10 +203,42 @@ module alttop(i_clk_8mhz,
 	//	port with one wire in and one wire out.  This utilizes our
 	//	control wires (qspi_bmod) to set the output lines appropriately.
 	//
-	assign io_qspi_dat = (~qspi_bmod[1])?({2'b11,1'bz,qspi_dat[0]})
+	//
+	//	2'b0?	-- Normal SPI
+	//	2'b10	-- Quad Output
+	//	2'b11	-- Quad Input
+`ifdef	LOWLOGIC_FLASH
+	reg		r_qspi_cs_n;
+	reg	[1:0]	r_qspi_bmod;
+	reg	[3:0]	r_qspi_dat, r_qspi_z;
+	reg	[1:0]	r_qspi_sck;
+	always @(posedge clk_s)
+		r_qspi_sck <= qspi_sck;
+	xoddr	xqspi_sck({clk_s, clk_sn}, r_qspi_sck, o_qspi_sck);
+	initial	r_qspi_cs_n = 1'b1;
+	initial	r_qspi_z = 4'b1101;
+	always @(posedge clk_s)
+	begin
+		r_qspi_dat  <= (qspi_bmod[1]) ? qspi_dat:{ 3'b111, qspi_dat[0]};
+		r_qspi_z    <= (!qspi_bmod[1])? 4'b1101
+				: ((qspi_bmod[0]) ? 4'h0 : 4'hf);
+		r_qspi_cs_n <= qspi_cs_n;
+	end
+
+	assign	o_qspi_cs_n    = r_qspi_cs_n;
+	assign	io_qspi_dat[0] = (r_qspi_z[0]) ? r_qspi_dat[0] : 1'bz;
+	assign	io_qspi_dat[1] = (r_qspi_z[1]) ? r_qspi_dat[1] : 1'bz;
+	assign	io_qspi_dat[2] = (r_qspi_z[2]) ? r_qspi_dat[2] : 1'bz;
+	assign	io_qspi_dat[3] = (r_qspi_z[3]) ? r_qspi_dat[3] : 1'bz;
+`else
+	assign io_qspi_dat = (!qspi_bmod[1])?({2'b11,1'bz,qspi_dat[0]})
 				:((qspi_bmod[0])?(4'bzzzz):(qspi_dat[3:0]));
 
-`else
+	assign	o_qspi_cs_n = qspi_cs_n;
+	assign	o_qspi_sck  = qspi_sck;
+`endif	// LOWLOGIC_FLASH
+
+`else	// BYPASS_LOGIC
 	reg	[26:0]	r_counter;
 	always @(posedge clk_s)
 		r_counter <= r_counter+1;
@@ -225,14 +265,14 @@ module alttop(i_clk_8mhz,
 	assign	uart_setup = 30'h080002b6;
 
 	assign	o_uart_rts_n = 1'b0;
-`endif
+`endif	// BYPASS_LOGIC
 	//
 	// I2C support
 	//
 	//	Supporting I2C requires a couple quick adjustments to our
 	//	GPIO lines.  Specifically, we'll allow that when the output
 	//	(i.e. w_gpio) pins are high, then the I2C lines float.  They
-	//	will be (need to be) pulled up by a resistor in order to 
+	//	will be (need to be) pulled up by a resistor in order to
 	//	match the I2C protocol, but this change makes them look/act
 	//	more like GPIO pins.
 	//

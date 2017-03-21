@@ -70,6 +70,9 @@ wbregs: $(OBJDIR)/wbregs.o $(BUSOBJS)
 scope: $(OBJDIR)/scope.o $(BUSOBJS)
 	$(CXX) $(CFLAGS) $^ $(LIBS) -o $@
 
+xpflashscop: $(OBJDIR)/scopecls.o $(OBJDIR)/xpflashscop.o $(BUSOBJS)
+	$(CXX) $(CFLAGS) $^ $(LIBS) -o $@
+
 readflash: $(OBJDIR)/readflash.o $(BUSOBJS)
 	$(CXX) $(CFLAGS) $^ $(LIBS) -o $@
 

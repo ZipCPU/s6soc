@@ -38,26 +38,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-// #include "asmstartup.h"
 #include "board.h"
 
 void	zip_idle(void);
-
-asm("\t.section\t.start\n"
-"\t.global\t_start\n"
-"\t.type\t_start,@function\n"
-"_start:\n"
-"\tMOV\tkernel_exit(PC),uPC\n"
-"\tLDI 104,R0\n"
-"\tSW R0,0x41c\n"
-"\tLDI 0xff,R0\n"
-"\tSW R0,0x414\n"
-"\tLDI\t_top_of_stack,SP\n"
-"\tJSR\tentry\n"
-"\tNEXIT\tR0\n"
-"kernel_exit:\n"
-"\tBUSY\n"
-"\t.section\t.text");
 
 void entry(void) {
 	const char	*msg = "Hello, World!\r\n", *ptr = msg;

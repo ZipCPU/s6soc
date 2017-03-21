@@ -46,7 +46,10 @@
 `define	FLASH_ACCESS
 `define	DBG_SCOPE	// About 204 LUTs, at 2^6 addresses
 // `define	COMPRESSED_SCOPE
+`define	HAS_RXUART
 `define	INCLUDE_CPU_RESET_LOGIC
+`define	LOWLOGIC_FLASH	//	Saves about 154 LUTs
+// `define	USE_LITE_UART	//	Saves about  55 LUTs
 module	busmaster(i_clk, i_rst,
 		i_uart, o_uart_rts_n, o_uart, i_uart_cts_n,
 		// The SPI Flash lines
@@ -75,7 +78,12 @@ module	busmaster(i_clk, i_rst,
 	input			i_uart, i_uart_cts_n;
 	output	wire		o_uart, o_uart_rts_n;
 	// SPI flash control
-	output	wire		o_qspi_cs_n, o_qspi_sck;
+	output	wire		o_qspi_cs_n;
+`ifdef	LOWLOGIC_FLASH
+	output	wire	[1:0]	o_qspi_sck;
+`else
+	output	wire		o_qspi_sck;
+`endif
 	output	wire	[3:0]	o_qspi_dat;
 	input		[3:0]	i_qspi_dat;
 	output	wire	[1:0]	o_qspi_mod;
@@ -140,11 +148,11 @@ module	busmaster(i_clk, i_rst,
 	end
 	assign	cpu_reset = btn_reset;
 `else
-	assign	cpu_reset = 1'b0;
+	assign	cpu_reset = (watchdog_int);
 `endif
 
 	zipbones #(CMOD_ZIPCPU_RESET_ADDRESS,ZA,6)
-		swic(i_clk, btn_reset, // 1'b0,
+		swic(i_clk, cpu_reset, // 1'b0,
 			// Zippys wishbone interface
 			wb_cyc, wb_stb, wb_we, w_zip_addr, wb_data, wb_sel,
 				wb_ack, wb_stall, wb_idata, wb_err,
@@ -437,7 +445,8 @@ module	busmaster(i_clk, i_rst,
 				wb_we, wb_data, spio_data,
 			o_kp_col, i_kp_row, i_btn, w_led,
 			keypad_int, button_int);
-	assign	o_led = { w_led[3]|w_interrupt,w_led[2]|zip_cpu_int,w_led[1:0] };
+	assign	o_led = { w_led[3]|w_interrupt,w_led[2]|zip_cpu_int,
+			w_led[1], w_led[0] };
 
 	//
 	// General purpose (sort of) I/O:  (Bottom two bits robbed in each
@@ -459,17 +468,40 @@ module	busmaster(i_clk, i_rst,
 	//
 	assign	uart_setup = UART_SETUP;
 	//
+`ifdef	HAS_RXUART
+`ifdef	USE_LITE_UART
+	rxuartlite	#(UART_SETUP[23:0])
+		rcvuart(i_clk, i_uart, rx_stb, rx_data);
+	assign	rx_break      = 1'b0;
+	assign	rx_parity_err = 1'b0;
+	assign	rx_frame_err  = 1'b0;
+	assign	rx_ck_uart    = 1'b0;
+`else
 	rxuart	#(UART_SETUP)
 		rcvuart(i_clk, 1'b0, uart_setup, i_uart, rx_stb, rx_data,
 			rx_break, rx_parity_err, rx_frame_err, rx_ck_uart);
+`endif
+`else
+	assign	rx_break      = 1'b0;
+	assign	rx_parity_err = 1'b0;
+	assign	rx_frame_err  = 1'b0;
+	assign	rx_ck_uart    = 1'b0;
+	assign	rx_stb        = 1'b0;
+	assign	rx_data       = 8'h0;
+`endif
 	//
 	wire	tx_break, tx_busy;
 	reg		tx_stb;
 	reg	[7:0]	tx_data;
 	assign	tx_break = 1'b0;
+`ifdef	USE_LITE_UART
+	txuartlite	#(UART_SETUP[23:0])
+		tcvuart(i_clk, tx_stb, tx_data, o_uart, tx_busy);
+`else
 	txuart	#(UART_SETUP)
 		tcvuart(i_clk, 1'b0, uart_setup, tx_break, tx_stb, tx_data,
 			i_uart_cts_n, o_uart, tx_busy);
+`endif
 
 	//
 	//	Rudimentary serial port control
@@ -487,6 +519,7 @@ module	busmaster(i_clk, i_rst,
 		end
 		else if ((tx_stb)&&(!tx_busy))
 			tx_stb <= 1'b0;
+`ifdef	HAS_RXUART
 	initial	rx_rdy = 1'b0;
 	always @(posedge i_clk)
 		if (rx_stb)
@@ -500,6 +533,10 @@ module	busmaster(i_clk, i_rst,
 	end
 	assign	o_uart_rts_n = (rx_rdy);
 	assign	uart_data = { 23'h0, !rx_rdy, r_rx_data };
+`else
+	assign	o_uart_rts_n = 1'b1;
+	assign	uart_data = 32'h00;
+`endif
 	//
 	// uart_ack gets returned as part of io_ack, since that happens when
 	// io_sel and wb_stb are defined
@@ -513,12 +550,22 @@ module	busmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
+`ifdef	LOWLOGIC_FLASH
+	qflashxpress	flashmem(i_clk,
+		wb_cyc,(wb_stb)&&(flash_sel),
+			wb_addr[(LGFLASHSZ-3):0],
+		flash_ack, flash_stall, flash_data,
+		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat);
+
+	assign	flash_interrupt = 1'b0;
+`else
 	wbqspiflash #(LGFLASHSZ)	flashmem(i_clk,
 		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
 			wb_addr[(LGFLASHSZ-3):0], wb_data,
 		flash_ack, flash_stall, flash_data,
 		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat,
 		flash_interrupt);
+`endif
 `else
 	reg	r_flash_ack;
 	initial	r_flash_ack = 1'b0;
