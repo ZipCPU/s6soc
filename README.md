@@ -65,3 +65,8 @@ questions, or even suggestions.
 
 20170309: All of the prior ZipOS functionality now works (again) using the new ZipCPU.
 
+20170321: The CPU can now execute instructions from flash in about 20 clocks
+per instruction--a number which includes the 8-20 clocks just to read from the
+flash.  Further, because this uses a simpler flash controller, and a simpler
+set of UART controllers, the whole CPU takes even fewer LUTs than before.
+
