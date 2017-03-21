@@ -505,7 +505,7 @@ module	altbusmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
-	wbqspiflash #(LGFLASHSZ)	flashmem(i_clk,
+	wbqspiflashp #(LGFLASHSZ)	flashmem(i_clk,
 		wb_cyc,(wb_stb)&&(flash_sel),(wb_stb)&&(flctl_sel),wb_we,
 			wb_addr[(LGFLASHSZ-3):0], wb_data,
 		flash_ack, flash_stall, flash_data,
