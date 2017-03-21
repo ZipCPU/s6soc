@@ -351,6 +351,7 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 		exit(-2);
 	}
 
+	if (flash) delete	flash;
 	if (m_fpga) delete	m_fpga;
 
 	return EXIT_SUCCESS;
