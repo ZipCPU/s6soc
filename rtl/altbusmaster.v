@@ -516,7 +516,6 @@ module	altbusmaster(i_clk, i_rst,
 	//	FLASH MEMORY CONFIGURATION ACCESS
 	//
 `ifdef	FLASH_ACCESS
-<<<<<<< HEAD
 `ifdef	LOWLOGIC_FLASH
 	wire	w_flash_ack;
 	qflashxpress	flashmem(i_clk,
