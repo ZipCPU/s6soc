@@ -4,7 +4,12 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	
+// Purpose:	To provide a bare minimum level of access to the two on-board
+//		buttons, the 4 LED's, and the external 4x4 keypad.  This
+//	routine does *nothing* to debounce either buttons or keypad.  Any such
+//	debouncing *must* be done in software.  As with the rest of the S6
+//	project, the goal is to keep the logic small and simple, and this
+//	module is no different.
 //
 //	With the USB cord on top, the board facing you, LED[0] is on the left.
 //
@@ -72,6 +77,12 @@ module	spio(i_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_data, o_wb_data,
 	reg	[3:0]	x_kp_row, r_kp_row;
 	reg	[1:0]	x_btn, r_btn;
 
+	initial	x_kp_row  = 4'h0;
+	initial	r_kp_row  = 4'b0;
+	initial	x_btn     = 2'b0;
+	initial	r_btn     = 2'b0;
+	initial	o_kp_int  = 1'b0;
+	initial	o_btn_int = 1'b0;
 	always @(posedge i_clk)
 	begin
 		x_kp_row <= i_kp_row;
