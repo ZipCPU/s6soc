@@ -11,7 +11,7 @@
 //	reset, the scope records a copy of the input data every time the clock
 //	ticks with the circuit enabled.  That is, it records these values up
 //	until the trigger.  Once the trigger goes high, the scope will record
-//	for bw_holdoff more counts before stopping.  Values may then be read
+//	for br_holdoff more counts before stopping.  Values may then be read
 //	from the buffer, oldest to most recent.  After reading, the scope may
 //	then be reset for another run.
 //
@@ -87,9 +87,11 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	i_wb_clk, i_wb_cyc, i_wb_stb, i_wb_we, i_wb_addr, i_wb_data,
 	o_wb_ack, o_wb_stall, o_wb_data,
 	o_interrupt);
-	parameter	LGMEM = 5'd10, BUSW = 32, SYNCHRONOUS=1,
-			DEFAULT_HOLDOFF = ((1<<(LGMEM-1))-4),
-			HOLDOFFBITS = 20;
+	parameter [4:0]			LGMEM = 5'd10;
+	parameter			BUSW = 32;
+	parameter [0:0]			SYNCHRONOUS=1;
+	parameter		 	HOLDOFFBITS = 20;
+	parameter [(HOLDOFFBITS-1):0]	DEFAULT_HOLDOFF = ((1<<(LGMEM-1))-4);
 	// The input signals that we wish to record
 	input				i_clk, i_ce, i_trigger;
 	input		[(BUSW-1):0]	i_data;
@@ -110,23 +112,25 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	// Our status/config register
 	wire		bw_reset_request, bw_manual_trigger,
 			bw_disable_trigger, bw_reset_complete;
-	reg	[22:0]	br_config;
-	wire	[(HOLDOFFBITS-1):0]	bw_holdoff;
-	initial	br_config = DEFAULT_HOLDOFF;
+	reg	[2:0]	br_config;
+	reg	[(HOLDOFFBITS-1):0]	br_holdoff;
+	initial	br_config = 3'b0;
+	initial	br_holdoff = DEFAULT_HOLDOFF;
 	always @(posedge i_wb_clk)
-		if ((i_wb_stb)&&(~i_wb_addr))
+		if ((i_wb_stb)&&(!i_wb_addr))
 		begin
 			if (i_wb_we)
+			begin
 				br_config <= { i_wb_data[31],
-					(i_wb_data[27]), 
-					i_wb_data[26],
-					i_wb_data[19:0] };
+					i_wb_data[27],
+					i_wb_data[26] };
+				br_holdoff = i_wb_data[(HOLDOFFBITS-1):0];
+			end
 		end else if (bw_reset_complete)
-			br_config[22] <= 1'b1;
-	assign	bw_reset_request   = (~br_config[22]);
-	assign	bw_manual_trigger  = (br_config[21]);
-	assign	bw_disable_trigger = (br_config[20]);
-	assign	bw_holdoff         = br_config[(HOLDOFFBITS-1):0];
+			br_config[2] <= 1'b1;
+	assign	bw_reset_request   = (!br_config[2]);
+	assign	bw_manual_trigger  = (br_config[1]);
+	assign	bw_disable_trigger = (br_config[0]);
 
 	wire	dw_reset, dw_manual_trigger, dw_disable_trigger;
 	generate
@@ -180,8 +184,7 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	reg	dr_triggered, dr_primed;
 	wire	dw_trigger;
 	assign	dw_trigger = (dr_primed)&&(
-				((i_trigger)&&(~dw_disable_trigger))
-				||(dr_triggered)
+				((i_trigger)&&(!dw_disable_trigger))
 				||(dw_manual_trigger));
 	initial	dr_triggered = 1'b0;
 	always @(posedge i_clk)
@@ -196,12 +199,6 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	// Writes take place on the data clock
 	// The counter is unsigned
 	(* ASYNC_REG="TRUE" *) reg	[(HOLDOFFBITS-1):0]	counter;
-	reg	less_than_holdoff;
-	always @(posedge i_clk)
-		if (dw_reset)
-			less_than_holdoff <= 1'b1;
-		else if (i_ce)
-			less_than_holdoff <= (counter < bw_holdoff);
 
 	reg		dr_stopped;
 	initial	dr_stopped = 1'b0;
@@ -209,19 +206,17 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	always @(posedge i_clk)
 		if (dw_reset)
 			counter <= 0;
-		else if ((i_ce)&&(dr_triggered)&&(~dr_stopped))
+		else if ((i_ce)&&(dr_triggered)&&(!dr_stopped))
 		begin // MUST BE a < and not <=, so that we can keep this w/in
 			// 20 bits.  Else we'd need to add a bit to comparison 
 			// here.
 			counter <= counter + 1'b1;
 		end
 	always @(posedge i_clk)
-		if ((~dr_triggered)||(dw_reset))
+		if ((!dr_triggered)||(dw_reset))
 			dr_stopped <= 1'b0;
-		else if (i_ce)
-			dr_stopped <= (counter+1'b1 >= bw_holdoff);
 		else
-			dr_stopped <= (counter >= bw_holdoff);
+			dr_stopped <= (counter >= br_holdoff);
 
 	//
 	//	Actually do our writes to memory.  Record, via 'primed' when
@@ -296,10 +291,10 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 		if ((bw_reset_request)
 			||((bw_cyc_stb)&&(i_wb_addr)&&(i_wb_we)))
 			raddr <= 0;
-		else if ((bw_cyc_stb)&&(i_wb_addr)&&(~i_wb_we)&&(bw_stopped))
+		else if ((bw_cyc_stb)&&(i_wb_addr)&&(!i_wb_we)&&(bw_stopped))
 			raddr <= raddr + 1'b1; // Data read, when stopped
 
-		if ((bw_cyc_stb)&&(~i_wb_we))
+		if ((bw_cyc_stb)&&(!i_wb_we))
 		begin // Read from the bus
 			br_wb_ack <= 1'b1;
 		end else if ((bw_cyc_stb)&&(i_wb_we))
@@ -312,11 +307,11 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	reg	[31:0]	nxt_mem;
 	always @(posedge i_wb_clk)
 		nxt_mem <= mem[raddr+waddr+
-			(((bw_cyc_stb)&&(i_wb_addr)&&(~i_wb_we)) ?
+			(((bw_cyc_stb)&&(i_wb_addr)&&(!i_wb_we)) ?
 				{{(LGMEM-1){1'b0}},1'b1} : { (LGMEM){1'b0}} )];
 
 	wire	[19:0]	full_holdoff;
-	assign full_holdoff[(HOLDOFFBITS-1):0] = bw_holdoff;
+	assign full_holdoff[(HOLDOFFBITS-1):0] = br_holdoff;
 	generate if (HOLDOFFBITS < 20)
 		assign full_holdoff[19:(HOLDOFFBITS)] = 0;
 	endgenerate
@@ -324,7 +319,7 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 	wire	[4:0]	bw_lgmem;
 	assign		bw_lgmem = LGMEM;
 	always @(posedge i_wb_clk)
-		if (~i_wb_addr) // Control register read
+		if (!i_wb_addr) // Control register read
 			o_wb_data <= { bw_reset_request,
 					bw_stopped,
 					bw_triggered,
@@ -334,7 +329,7 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 					(raddr == {(LGMEM){1'b0}}),
 					bw_lgmem,
 					full_holdoff  };
-		else if (~bw_stopped) // read, prior to stopping
+		else if (!bw_stopped) // read, prior to stopping
 			o_wb_data <= i_data;
 		else // if (i_wb_addr) // Read from FIFO memory
 			o_wb_data <= nxt_mem; // mem[raddr+waddr];
@@ -344,12 +339,12 @@ module wbscope(i_clk, i_ce, i_trigger, i_data,
 
 	reg	br_level_interrupt;
 	initial	br_level_interrupt = 1'b0;
-	assign	o_interrupt = (bw_stopped)&&(~bw_disable_trigger)
-					&&(~br_level_interrupt);
+	assign	o_interrupt = (bw_stopped)&&(!bw_disable_trigger)
+					&&(!br_level_interrupt);
 	always @(posedge i_wb_clk)
 		if ((bw_reset_complete)||(bw_reset_request))
 			br_level_interrupt<= 1'b0;
 		else
-			br_level_interrupt<= (bw_stopped)&&(~bw_disable_trigger);
+			br_level_interrupt<= (bw_stopped)&&(!bw_disable_trigger);
 
 endmodule
