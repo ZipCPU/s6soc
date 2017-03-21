@@ -79,9 +79,15 @@ void	skip_bitfile_header(FILE *fp) {
 		//
 		0xaa, 0x99, 0x55, 0x66 };
 	unsigned char	buf[SEARCHLN];
+	size_t	nr;
 
 	rewind(fp);
-	fread(buf, sizeof(char), SEARCHLN, fp);
+	nr = fread(buf, sizeof(char), SEARCHLN, fp);
+	if (nr != SEARCHLN) {
+		fprintf(stderr, "Cannot read the Xilinx bitfile header\n");
+		perror("O/S Err:");
+		exit(EXIT_FAILURE);
+	}
 	for(int start=0; start+MATCHLN<SEARCHLN; start++) {
 		int	mloc;
 
@@ -91,8 +97,11 @@ void	skip_bitfile_header(FILE *fp) {
 			if (buf[start+mloc] != matchstr[mloc])
 				break;
 		if (mloc < 0) {
-			fseek(fp, start, SEEK_SET);
-			return;
+			if (fseek(fp, (long)start, SEEK_SET) != 0) {
+				fprintf(stderr, "Cannot seek to the end of the Xilinx header\n");
+				perror("O/S Err:");
+				exit(EXIT_FAILURE);
+			} return;
 		}
 	}
 
@@ -104,7 +113,7 @@ void	skip_bitfile_header(FILE *fp) {
 int main(int argc, char **argv) {
 	int		skp=0, argn;
 	bool		debug_only = false, verbose = false;
-	bool		ignore_missing_memory = false;
+	bool		ignore_missing_memory = true;
 	unsigned	entry = 0;
 	FLASHDRVR	*flash = NULL;
 	const char	*bitfile = NULL, *altbitfile = NULL, *execfile = NULL;
@@ -146,7 +155,11 @@ int main(int argc, char **argv) {
 
 
 	for(argn=0; argn<argc; argn++) {
-		if (iself(argv[argn])) {
+		if (access(argv[argn], R_OK)!=0) {
+			printf("ERR: Cannot open %s\n", argv[argn]);
+			usage();
+			exit(EXIT_FAILURE);
+		} else if (iself(argv[argn])) {
 			if (execfile) {
 				printf("Too many executable files given, %s and %s\n", execfile, argv[argn]);
 				usage();
@@ -186,6 +199,8 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 	if ((bitfile)&&(access(bitfile,R_OK)!=0)) {
 		// If there's no code file, or the code file cannot be opened
 		fprintf(stderr, "Cannot open bitfile, %s\n", bitfile);
+		if (iself(bitfile))
+			fprintf(stderr, "Is %s an ELF executable??\n", bitfile);
 		exit(EXIT_FAILURE);
 	}
 
@@ -198,7 +213,7 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 		fprintf(stderr, "Cannot open executable, %s\n\n", execfile);
 		usage();
 		exit(EXIT_FAILURE);
-	} else if (!iself(execfile)) {
+	} else if ((execfile)&&(!iself(execfile))) {
 		printf("%s is not an executable file\n\n", execfile);
 		usage();
 		exit(EXIT_FAILURE);
@@ -235,7 +250,7 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 	if (bitfile) {
 
 		fp = fopen(bitfile, "r");
-		if (strcmp(&argv[argn][strlen(argv[argn])-4],".bit")==0)
+		if (strcmp(&bitfile[strlen(bitfile)-4],".bit")==0)
 			skip_bitfile_header(fp);
 		bitsz = fread(&fbuf[CONFIG_ADDRESS-SPIFLASH],
 				sizeof(fbuf[0]),
@@ -298,10 +313,14 @@ if (execfile)	printf("EXECTFILE: %s\n", execfile);
 						<= SPIFLASH+FLASHLEN))
 				valid = true;
 			if (!valid) {
-				fprintf(stderr, "No such memory on board: 0x%08x - %08x\n",
-					secp->m_start, secp->m_start+secp->m_len);
-				if (!ignore_missing_memory)
+				if (ignore_missing_memory)
+					fprintf(stderr, "WARNING: No such memory on board: 0x%08x - %08x\n",
+						secp->m_start, secp->m_start+secp->m_len);
+				else {
+					fprintf(stderr, "ERROR: No such memory on board: 0x%08x - %08x\n",
+						secp->m_start, secp->m_start+secp->m_len);
 					exit(EXIT_FAILURE);
+				}
 			}
 		}
 
