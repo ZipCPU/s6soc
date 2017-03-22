@@ -103,7 +103,7 @@
 // mode.
 //
 //
-// `define	OPT_DIVIDE
+`define	OPT_DIVIDE
 //
 //
 //
@@ -147,7 +147,7 @@
 // I recommend only defining this if you "need" to, if area is tight and
 // speed isn't as important.  Otherwise, just leave this undefined.
 //
-// `define	OPT_SINGLE_FETCH	// 2228 total LUTs
+//`define	OPT_SINGLE_FETCH // 2047 total LUTs (savings of 181 from before)
 //
 //
 // OPT_DOUBLE_FETCH is an alternative to OPT_SINGLE_FETCH.  It is designed to
@@ -168,8 +168,9 @@
 // should prevent that).
 //
 //
+// // COST: about 79 LUTs over and above the SINGLE_FETCH cost [2091 LUTs]
 `ifndef	OPT_SINGLE_FETCH
-`define	OPT_DOUBLE_FETCH	// COST: about 79 LUTs over the SINGLE_FETCH
+`define	OPT_DOUBLE_FETCH
 `endif
 //
 //
@@ -182,7 +183,10 @@
 // prefetch.  Set OPT_CIS to include these compressed instructions as part of
 // the instruction set.
 //
-`define OPT_CIS		// COST: about 87 LUTs
+//
+// // COST: about 87 LUTs
+//
+`define OPT_CIS
 //
 //
 //
@@ -195,7 +199,8 @@
 // the compiler's branch prediction optimizer: BRA's barely stall, while
 // conditional branches will always suffer about 4 stall cycles or so.
 //
-// I recommend setting this flag, so as to turn early branching on.
+// I recommend setting this flag, so as to turn early branching on---if you
+// have the LUTs available to afford it.
 //
 // `define	OPT_EARLY_BRANCHING
 //

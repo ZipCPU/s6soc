@@ -49,7 +49,7 @@
 `define	HAS_RXUART
 `define	INCLUDE_CPU_RESET_LOGIC
 `define	LOWLOGIC_FLASH	//	Saves about 154 LUTs
-// `define	USE_LITE_UART	//	Saves about  55 LUTs
+`define	USE_LITE_UART	//	Saves about  55 LUTs
 module	busmaster(i_clk, i_rst,
 		i_uart, o_uart_rts_n, o_uart, i_uart_cts_n,
 		// The SPI Flash lines
