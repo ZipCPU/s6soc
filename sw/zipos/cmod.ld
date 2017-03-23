@@ -47,15 +47,17 @@ _sdram_image_end   = 0;
 
 SECTIONS
 {
-	.rocode 0x1200000 : {
+	.rocode 0x1200000 : ALIGN(4) {
 		_boot_address = .;
-		*(.start) *(.boot)
+		*(.start) *(.boot*)
 		*(.text*)
 		*(.rodata*)
 		*(.strings*)
+		__rocode_alignment = (. + 3) & ~ 3;
+		. = __rocode_alignment;
 		} > flash
 	_kernel_image_start = . ;
-	.data : {
+	.data : ALIGN_WITH_INPUT {
 		*(.kernel*)
 		*(.fixdata*)
 		*(.data*)
@@ -63,7 +65,7 @@ SECTIONS
 		_kernel_image_end = . ;
 		}> blkram AT> flash
 	_blkram_image_end = . ;
-	.bss : {
+	.bss : ALIGN_WITH_INPUT {
 		*(.bss*)
 		_bss_image_end = . ;
 		} > blkram
