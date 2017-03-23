@@ -528,7 +528,7 @@ module	busmaster(i_clk, i_rst,
 	begin
 		if((wb_stb)&&(io_sel)&&(wb_addr[3:0]==4'h7)&&(!wb_we))
 			rx_rdy <= rx_stb;
-		else if (rx_stb)
+		else
 			rx_rdy <= (rx_rdy | rx_stb);
 	end
 	assign	o_uart_rts_n = (rx_rdy);

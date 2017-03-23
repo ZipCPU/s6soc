@@ -106,7 +106,8 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 
 
 	wire	[4:0]	w_op;
-	wire		w_ldi, w_mov, w_cmptst, w_ldilo, w_ALU, w_brev, w_noop;
+	wire		w_ldi, w_mov, w_cmptst, w_ldilo, w_ALU, w_brev,
+			w_noop, w_lock;
 	wire	[4:0]	w_dcdR, w_dcdB, w_dcdA;
 	wire		w_dcdR_pc, w_dcdR_cc;
 	wire		w_dcdA_pc, w_dcdA_cc;
@@ -218,9 +219,21 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	// If the result register is either CC or PC, and this would otherwise
 	// be a floating point instruction with floating point opcode of 0,
 	// then this is a NOOP.
+	assign	w_lock   = (!iword[31])&&(w_op[4:0]==5'h1d)&&(
+				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1]==3'h7))
+				||(IMPLEMENT_FPU==0));
+`ifdef	OPT_PIPELINED
 	assign	w_noop   = (!iword[31])&&(w_op[4:0] == 5'h1f)&&(
 			((IMPLEMENT_FPU>0)&&(w_dcdR[3:1] == 3'h7))
 			||(IMPLEMENT_FPU==0));
+`else
+	// Allow w_lock's to set the w_noop bit in the case of no pipelining
+	assign	w_noop   = (!iword[31])
+			&&((w_op[4:0] == 5'h1f)||(w_op[4:0]==5'h1d))
+			&&(
+				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1] == 3'h7))
+				||(IMPLEMENT_FPU==0));
+`endif
 
 	// dcdB - What register is used in the opB?
 	//
@@ -387,9 +400,9 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 				&&(w_dcdR[3:1]==3'h7)
 				&&(
 					(w_cis_op[2:0] != 3'h4)	// BREAK
-`ifdef	OPT_PIPELINED
+// `ifdef	OPT_PIPELINED
 					&&(w_cis_op[2:0] != 3'h5)	// LOCK
-`endif
+// `endif
 					// SIM instructions are always illegal
 					&&(w_cis_op[2:0] != 3'h7)))	// NOOP
 				o_illegal <= 1'b1;
@@ -464,9 +477,7 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1]==3'h7))
 				||(IMPLEMENT_FPU==0));
 `ifdef	OPT_PIPELINED
-			r_lock  <= (!iword[31])&&(w_op[4:0]==5'h1d)&&(
-				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1]==3'h7))
-				||(IMPLEMENT_FPU==0));
+			r_lock  <= w_lock;
 `endif
 `ifdef	OPT_CIS
 			r_nxt_half <= { iword[31], iword[14:0] };
