@@ -1,6 +1,7 @@
 display
 doorbell
 doorbell2
+uartecho
 helloworld
 kptest
 blinky
@@ -9,6 +10,7 @@ cputestcis
 display.txt
 doorbell.txt
 doorbell2.txt
+uartecho.txt
 helloworld.txt
 kptest.txt
 blinky.txt

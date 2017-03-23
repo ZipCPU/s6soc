@@ -45,8 +45,9 @@
 ################################################################################
 ##
 ##
+# Declare "all" to be the default target
 all:
-PROGRAMS := helloworld doorbell doorbell2 kptest blinky cputest
+PROGRAMS := helloworld doorbell doorbell2 kptest blinky cputest uartecho
 all: $(OBJDIR)/ $(PROGRAMS)
 
 
@@ -61,7 +62,7 @@ OBJDUMP := $(CROSS)-objdump
 # Not for build, for for building tags and dependency files, we need to know
 # what the sources and headers are
 DEVDRVR:= keypad.c display.c rtcsim.c txfns.c
-SOURCES:= helloworld.c doorbell.c doorbell2.c kptest.c $(DEVDRVR)
+SOURCES:= helloworld.c doorbell.c doorbell2.c kptest.c uartecho.c $(DEVDRVR)
 HEADERS:= board.h
 OBJDRVR := $(addprefix $(OBJDIR)/,$(subst .c,.o,$(DEVDRVR)))
 
@@ -108,6 +109,9 @@ helloworld: $(OBJDIR)/helloworld.o $(STARTOBJ) cmod.ld
 	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/helloworld.o -o $@
 $(OBJDIR)/helloworld.txt: helloworld
 	$(OBJDUMP) -dr $^ > $@
+
+uartecho: $(OBJDIR)/uartecho.o $(STARTOBJ) cmod.ld
+	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/uartecho.o -o $@
 
 doorbell: $(OBJDIR)/doorbell.o $(STARTOBJ) cmod.ld
 	$(CC) $(LDFLAGS) $(STARTOBJ) $(OBJDIR)/doorbell.o -o $@
