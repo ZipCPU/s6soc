@@ -2,6 +2,7 @@ xilinx/
 obj_dir/
 obj-pc/
 obj-zip/
+*.a
 *.vcd
 *.swp
 cpudefs.h
