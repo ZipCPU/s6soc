@@ -102,6 +102,7 @@ public:
 #define	cpu_wr_reg_id	v__DOT__swic__DOT__thecpu__DOT__wr_reg_id
 #define	cpu_wr_gpreg_vl	v__DOT__swic__DOT__thecpu__DOT__wr_gpreg_vl
 #define	cpu_wr_flags_ce	v__DOT__swic__DOT__thecpu__DOT__wr_flags_ce
+#define	cpu_halted	v__DOT__zip_cpu_int
 //
 #define	pic_gie		v__DOT__pic__DOT__r_gie
 #define	pic_int_enable	v__DOT__pic__DOT__r_int_enable
@@ -544,9 +545,15 @@ int	main(int argc, char **argv) {
 
 	tb->reset();
 
-	while(1)
+	while(!tb->m_core->cpu_halted)
 		tb->tick();
 
+	if (tb->m_core->cpu_halted) {
+		tb->tick();
+		tb->tick();
+		tb->tick();
+		printf("CPU HALTED\n");
+	}
 	printf("SUCCESS!\n");
 	exit(0);
 }
