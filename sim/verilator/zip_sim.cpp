@@ -114,6 +114,7 @@ public:
 #define	wb_addr		v__DOT__w_zip_addr
 //
 #define	wb_ack		v__DOT__wb_ack
+#define	wb_err		v__DOT__wb_err
 #define	wb_stall	v__DOT__wb_stall
 #define	wb_idata	v__DOT__wb_idata
 //
@@ -408,12 +409,13 @@ public:
 
 		if (m_dbg) {
 			fprintf(m_dbg, "%10ld - ", m_tickcount);
-			fprintf(m_dbg, "WB: %s%s%s/%s%s[@0x%08x] %08x->%08x",
+			fprintf(m_dbg, "WB: %s%s%s/%s%s%s[@0x%08x] %08x->%08x",
 				(m_core->wb_cyc)?"CYC":"   ",
 				(m_core->wb_stb)?"/STB":"    ",
 				(m_core->wb_we )?"W":"R",
 				(m_core->wb_ack)?"ACK":"   ",
 				(m_core->wb_stall)?"STL":"   ",
+				(m_core->wb_err)?"ERR":"   ",
 				(m_core->wb_addr<<2),
 				(m_core->wb_data),
 				(m_core->wb_idata)
