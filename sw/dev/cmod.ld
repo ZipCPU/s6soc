@@ -38,14 +38,36 @@ MEMORY
 	flash  (rx) : ORIGIN = 0x1000000, LENGTH = 0x1000000
 }
 
+_flash	= ORIGIN(flash);
+_blkram	= ORIGIN(blkram);
+_sdram	= 0;
 _top_of_stack = ORIGIN(blkram) + LENGTH(blkram) - 4;
+_sdram_image_start = 0;
+_sdram_image_end   = 0;
 
 SECTIONS
 {
-  . = 0x1200000;
-  .rocode 0x1200000 : { *(.start) *(.text*)
-	*(.rodata*)
-	*(.strings*) } > flash
-  .data : { *(.fixdata*) *(.data*) *(COMMON*) *(.bss*) } > blkram
-  _top_of_heap = .;
+	.rocode 0x1200000 : ALIGN(4) {
+		_boot_address = .;
+		*(.start) *(.boot*)
+		*(.text*)
+		*(.rodata*)
+		*(.strings*)
+		__rocode_alignment = (. + 3) & ~ 3;
+		. = __rocode_alignment;
+		} > flash
+	_kernel_image_start = . ;
+	.data : ALIGN_WITH_INPUT {
+		*(.kernel*)
+		*(.fixdata*)
+		*(.data*)
+		*(COMMON*)
+		_kernel_image_end = . ;
+		}> blkram AT> flash
+	_blkram_image_end = . ;
+	.bss : ALIGN_WITH_INPUT {
+		*(.bss*)
+		_bss_image_end = . ;
+		} > blkram
+	_top_of_heap = .;
 }
