@@ -4,7 +4,11 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:
+// Purpose:	These are some *very* simple UART routines, designed to support
+//		a program before the C-library is up and running.  Once the
+//	C-library is running on a device, it is anticipated that these routines
+//	will no longer be needed or used--since they access the raw hardware
+//	device(s).
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -42,6 +46,13 @@ void	txchr(char ch);
 void	txval(int val);
 void	txstr(const char *str);
 
+/*
+ * txchr()
+ *
+ * This is the fundamental routine within here.  It transmits one character out of the UART,
+ * polling the UART device to determine when/if it is idle to send the next character.
+ *
+ */
 void	txchr(char val) {
 	volatile IOSPACE *const sys = _sys;
 	unsigned v = (unsigned char)val;
@@ -59,12 +70,22 @@ void	txchr(char val) {
 	sys->io_pic = INT_UARTTX;
 }
 
+/*
+ * txstr()
+ *
+ * Called to send a string to the UART port.  This works by calling txchr to
+ * do its real work.
+ */
 void    txstr(const char *str) {
 	const	char *ptr = str;
 	while(*ptr)
 		txchr(*ptr++);
 }
 
+/*
+ * txval()
+ *
+ */
 void	txval(int val) {
 	txstr("\r\n0x");
 	for(int i=28; i>=0; i-=4) {
@@ -75,6 +96,12 @@ void	txval(int val) {
 	}
 }
 
+/*
+ * txhex()
+ *
+ * Send a hexadecimal value to the output port, followed by a carriage
+ * return and newline.
+ */
 void	txhex(int val) {
 	for(int i=28; i>=0; i-=4) {
 		int ch = ((val>>i)&0x0f)+'0';
