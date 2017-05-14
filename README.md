@@ -70,6 +70,11 @@ per instruction--a number which includes the 8-20 clocks just to read from the
 flash.  Further, because this uses a simpler flash controller, and a simpler
 set of UART controllers, the whole CPU takes even fewer LUTs than before.
 
+20170514: I'm placing this project back on my _done_ list of tasks.  It works
+again, and now with C--library support as well.  Even better, I can run
+[4x4x4 Tic-Tac-Toe](https://github.com/ZipCPU/tttt) on the board using only
+standard library interfaces.
+
 # Commercial Applications
 
 Because this design is very small, it can easily be included into a larger
