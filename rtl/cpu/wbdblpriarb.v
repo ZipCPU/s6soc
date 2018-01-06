@@ -117,7 +117,6 @@ module	wbdblpriarb(i_clk, i_rst,
 	always @(posedge i_clk)
 		if (i_rst)
 			r_a_owner <= 1'b1;
-		/*
 		// Remain with the "last owner" until 1) the other bus requests
 		// access, and 2) the last owner no longer wants it.  This
 		// logic "idles" on the last owner.
@@ -126,6 +125,7 @@ module	wbdblpriarb(i_clk, i_rst,
 		//
 		else if ((!o_cyc_a)&&(!o_cyc_b))
 			r_a_owner <= ((i_b_stb_a)||(i_b_stb_b))? 1'b0:1'b1;
+		/*
 		//
 		// Expanding this out
 		//
@@ -152,11 +152,13 @@ module	wbdblpriarb(i_clk, i_rst,
 		// If a request is made from B, AND A is idle, THEN
 		// switch.  Otherwise, if B is ever idle, revert back to A
 		// regardless of whether A wants it or not.
+		/*
 		else if ((!i_b_cyc_a)&&(!i_b_cyc_b))
 			r_a_owner <= 1'b1;
 		else if ((!i_a_cyc_a)&&(!i_a_cyc_b)
 				&&((i_b_stb_a)||(i_b_stb_b)))
 			r_a_owner <= 1'b0;
+		*/
 
 
 	assign o_we    = (r_a_owner) ? i_a_we    : i_b_we;
