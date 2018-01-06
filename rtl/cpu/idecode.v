@@ -43,6 +43,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
 //
 `define	CPU_SP_REG	4'hd
 `define	CPU_CC_REG	4'he
@@ -62,17 +63,17 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 		o_cond, o_wF,
 		o_op, o_ALU, o_M, o_DV, o_FP, o_break, o_lock,
 		o_wR, o_rA, o_rB,
-		o_early_branch, o_branch_pc, o_ljmp,
+		o_early_branch, o_early_branch_stb, o_branch_pc, o_ljmp,
 		o_pipe,
 		o_sim, o_sim_immv
 		);
 	parameter	ADDRESS_WIDTH=24, IMPLEMENT_MPY=1, EARLY_BRANCHING=1,
 			IMPLEMENT_DIVIDE=1, IMPLEMENT_FPU=0, AW = ADDRESS_WIDTH;
-	input			i_clk, i_rst, i_ce, i_stalled;
-	input	[31:0]		i_instruction;
-	input			i_gie;
-	input	[(AW-1):0]	i_pc;
-	input			i_pf_valid, i_illegal;
+	input	wire		i_clk, i_rst, i_ce, i_stalled;
+	input	wire [31:0]	i_instruction;
+	input	wire		i_gie;
+	input	wire [(AW-1):0]	i_pc;
+	input	wire		i_pf_valid, i_illegal;
 	output	wire		o_valid, o_phase;
 	output	reg		o_illegal;
 	output	reg	[AW:0]	o_pc;
@@ -86,17 +87,13 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	output	reg		o_ALU, o_M, o_DV, o_FP, o_break;
 	output	wire		o_lock;
 	output	reg		o_wR, o_rA, o_rB;
-	output	wire		o_early_branch;
+	output	wire		o_early_branch, o_early_branch_stb;
 	output	wire	[(AW-1):0]	o_branch_pc;
 	output	wire		o_ljmp;
 	output	wire		o_pipe;
 	output	reg		o_sim		/* verilator public_flat */;
 	output	reg	[22:0]	o_sim_immv	/* verilator public_flat */;
 
-	wire	dcdA_stall, dcdB_stall, dcdF_stall;
-	wire			o_dcd_early_branch;
-	wire	[(AW-1):0]	o_dcd_branch_pc;
-	reg	o_dcdI, o_dcdIz;
 `ifdef	OPT_PIPELINED
 	reg	r_lock;
 `endif
@@ -222,18 +219,9 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	assign	w_lock   = (!iword[31])&&(w_op[4:0]==5'h1d)&&(
 				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1]==3'h7))
 				||(IMPLEMENT_FPU==0));
-`ifdef	OPT_PIPELINED
 	assign	w_noop   = (!iword[31])&&(w_op[4:0] == 5'h1f)&&(
 			((IMPLEMENT_FPU>0)&&(w_dcdR[3:1] == 3'h7))
 			||(IMPLEMENT_FPU==0));
-`else
-	// Allow w_lock's to set the w_noop bit in the case of no pipelining
-	assign	w_noop   = (!iword[31])
-			&&((w_op[4:0] == 5'h1f)||(w_op[4:0]==5'h1d))
-			&&(
-				((IMPLEMENT_FPU>0)&&(w_dcdR[3:1] == 3'h7))
-				||(IMPLEMENT_FPU==0));
-`endif
 
 	// dcdB - What register is used in the opB?
 	//
@@ -400,9 +388,9 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 				&&(w_dcdR[3:1]==3'h7)
 				&&(
 					(w_cis_op[2:0] != 3'h4)	// BREAK
-// `ifdef	OPT_PIPELINED
+`ifdef	OPT_PIPELINED
 					&&(w_cis_op[2:0] != 3'h5)	// LOCK
-// `endif
+`endif
 					// SIM instructions are always illegal
 					&&(w_cis_op[2:0] != 3'h7)))	// NOOP
 				o_illegal <= 1'b1;
@@ -502,7 +490,9 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 	generate
 	if (EARLY_BRANCHING!=0)
 	begin
-		reg			r_early_branch, r_ljmp;
+		reg			r_early_branch,
+					r_early_branch_stb,
+					r_ljmp;
 		reg	[(AW-1):0]	r_branch_pc;
 
 		initial r_ljmp = 1'b0;
@@ -519,24 +509,38 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 
 		always @(posedge i_clk)
 		if (i_rst)
-			r_early_branch <= 1'b0;
-		else if ((i_ce)&&(i_pf_valid))
+		begin
+			r_early_branch     <= 1'b0;
+			r_early_branch_stb <= 1'b0;
+		end else if ((i_ce)&&(i_pf_valid))
 		begin
 			if (r_ljmp)
+			begin
 				// LOD (PC),PC
-				r_early_branch <= 1'b1;
-			else if ((!iword[31])&&(iword[30:27]==`CPU_PC_REG)
+				r_early_branch     <= 1'b1;
+				r_early_branch_stb <= 1'b1;
+			end else if ((!iword[31])&&(iword[30:27]==`CPU_PC_REG)
 					&&(w_cond[3]))
 			begin
 				if ((w_op[4:0]==5'h02)&&(!iword[18]))
+				begin
 					// Add x,PC
 					r_early_branch     <= 1'b1;
-				else
+					r_early_branch_stb  <= 1'b1;
+				end else begin
 					r_early_branch     <= 1'b0;
-			end else
+					r_early_branch_stb  <= 1'b0;
+				end
+			end else begin
 				r_early_branch <= 1'b0;
+				r_early_branch_stb <= 1'b0;
+			end
 		end else if (i_ce)
-			r_early_branch <= 1'b0;
+		begin
+			r_early_branch     <= 1'b0;
+			r_early_branch_stb <= 1'b0;
+		end else
+			r_early_branch_stb <= 1'b0;
 
 		always @(posedge i_clk)
 			if (i_ce)
@@ -551,10 +555,12 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 
 		assign	w_ljmp_dly         = r_ljmp;
 		assign	o_early_branch     = r_early_branch;
+		assign	o_early_branch_stb = r_early_branch_stb;
 		assign	o_branch_pc        = r_branch_pc;
 	end else begin
 		assign	w_ljmp_dly         = 1'b0;
-		assign	o_early_branch = 1'b0;
+		assign	o_early_branch     = 1'b0;
+		assign	o_early_branch_stb = 1'b0;
 		assign	o_branch_pc = {(AW){1'b0}};
 		assign	o_ljmp = 1'b0;
 	end endgenerate
@@ -614,4 +620,9 @@ module	idecode(i_clk, i_rst, i_ce, i_stalled,
 
 	assign	o_I = { {(32-22){r_I[22]}}, r_I[21:0] };
 
+	// Make Verilator happy across all our various options
+	// verilator lint_off  UNUSED
+	wire	[3:0] possibly_unused;
+	assign	possibly_unused = { w_lock, w_ljmp, w_ljmp_dly, w_cis_ljmp };
+	// verilator lint_on  UNUSED
 endmodule

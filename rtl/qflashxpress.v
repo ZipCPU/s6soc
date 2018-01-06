@@ -61,13 +61,16 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
+//
 `define	OPT_FLASH_PIPELINE
-module	qflashxpress(i_clk,
+module	qflashxpress(i_clk, i_reset,
 		i_wb_cyc, i_wb_stb, i_wb_addr,
 			o_wb_ack, o_wb_stall, o_wb_data,
 		o_qspi_sck, o_qspi_cs_n, o_qspi_mod, o_qspi_dat, i_qspi_dat);
+	parameter [0:0]	OPT_FLASH_PIPELINE = 1'b1;
 	localparam	AW=24-2;
-	input			i_clk;
+	input			i_clk, i_reset;
 	//
 	input			i_wb_cyc, i_wb_stb;
 	input		[(AW-1):0] i_wb_addr;
@@ -99,7 +102,12 @@ module	qflashxpress(i_clk,
 	initial	m_counter   = 0;
 	initial	m_state     = 2'b00;
 	always @(posedge i_clk)
+	if (i_reset)
 	begin
+		maintenance <= 1'b1;
+		m_counter   <= 0;
+		m_state     <= 2'b00;
+	end else begin
 		if (maintenance)
 			m_counter <= m_counter + 1'b1;
 		m_mod <= 2'b00; // SPI mode always for maintenance
@@ -175,22 +183,29 @@ module	qflashxpress(i_clk,
 			data_pipe <= { data_pipe[27:0], 4'h0 };
 	assign	o_qspi_dat = (maintenance)? m_dat : data_pipe[31:28];
 
-`ifdef	OPT_FLASH_PIPELINE
-	reg	pipe_req;
+	wire	pipe_req, w_pipe_condition;
 
-	reg	[(AW-1):0]	last_addr;
-	always  @(posedge i_clk)
-		if ((i_wb_stb)&&(!o_wb_stall))
-			last_addr <= i_wb_addr;
+	generate
+	if (OPT_FLASH_PIPELINE)
+	begin
+		reg	r_pipe_req;
 
-	initial	pipe_req = 1'b0;
-	always @(posedge i_clk)
-		pipe_req <= (pre_ack)&&(i_wb_stb)
+		reg	[(AW-1):0]	last_addr;
+		always  @(posedge i_clk)
+			if ((i_wb_stb)&&(!o_wb_stall))
+				last_addr <= i_wb_addr;
+
+		assign	w_pipe_condition = (pre_ack)&&(i_wb_stb)
 				&&(last_addr + 1'b1 == i_wb_addr);
-`else
-	wire	pipe_req;
-	assign	pipe_req = 1'b0;
-`endif
+
+		initial	r_pipe_req = 1'b0;
+		always @(posedge i_clk)
+			r_pipe_req <= w_pipe_condition;
+
+		assign	pipe_req = r_pipe_req;
+	end else begin
+		assign	pipe_req = 1'b0;
+	end endgenerate
 
 
 	initial	pre_ack = 0;
@@ -247,5 +262,183 @@ module	qflashxpress(i_clk,
 	always @(posedge i_clk)
 		o_wb_data <= { o_wb_data[27:0], i_qspi_dat };
 
+`ifdef	FORMAL
+	localparam	F_LGDEPTH=3;
+	reg	f_past_valid;
+	wire	[(F_LGDEPTH-1):0]	f_nreqs, f_nacks,
+					f_outstanding;
+	reg	[(AW-1):0]	f_last_pc;
+	reg			f_last_pc_valid;
+	reg	[(AW-1):0]	f_req_addr;
+//
+//
+// Generic setup
+//
+//
+`ifdef	PREFETCH
+`define	ASSUME	assume
+	reg	f_last_clk;
+	initial	assume(f_last_clk == 1);
+	initial	assume(i_clk == 0);
+	always @($global_clock)
+	begin
+		assume(i_clk != f_last_clk);
+		f_last_clk <= !f_last_clk;
+	end
+`else
+`define	ASSUME	assert
+`endif
+
+	// Assume a clock
+
+	// Keep track of a flag telling us whether or not $past()
+	// will return valid results
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid = 1'b1;
+
+	/////////////////////////////////////////////////
+	//
+	//
+	// Assumptions about our inputs
+	//
+	//
+	/////////////////////////////////////////////////
+
+	//
+	// Nothing changes, but on the positive edge of a clock
+	//
+	always @($global_clock)
+	if (!$rose(i_clk))
+	begin
+		// Control inputs from the CPU
+		`ASSUME($stable(i_reset));
+		`ASSUME($stable(i_new_pc));
+		`ASSUME($stable(i_clear_cache));
+		`ASSUME($stable(i_stalled_n));
+		`ASSUME($stable(i_pc));
+	end
+
+
+	formal_slave #(.AW(AW), .DW(DW),.F_LGDEPTH(F_LGDEPTH),
+			.F_LGDEPTH(7),
+			.F_MAX_REQUESTS(2),
+			.F_MAX_STALL(25),
+			.F_MAX_ACK_DELAY(25),
+			.F_OPT_RMW_BUS_OPTION(0),
+			.F_OPT_DISCONTINUOUS(1))
+		f_wbm(i_clk, i_reset,
+			o_wb_cyc, o_wb_stb, 1'b0, o_wb_addr, o_wb_data, 4'h0,
+			i_wb_ack, i_wb_stall, i_wb_data, i_wb_err,
+			f_nreqs, f_nacks, f_outstanding);
+
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&($past(pipe_req))&&($past(o_wb_stall))
+				&&(i_wb_stb))
+			assert($stable(pipe_req));
+
+	always @(*)
+		if (maintenance)
+			assert(o_wb_stall);;
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&(!$past(i_reset))&&($past(maintenance)))
+			assert(m_counter == $past(m_counter)+1'b1);
+
+	always @(posedge i_clk)
+		if ((f_past_valid)&&($past(maintenance)))
+			assert(m_counter <= 15'd138+15'd48+15'd10);
+		else
+			assert(m_counter == 15'd138+15'd48+15'd10);
+
+	always @(*)
+		if (!maintenance)
+			assert(o_qspi_mod[1]);
+
+	assign	f_rd = (!o_qspi_mod[0]);
+	assign	f_wr = ( o_qspi_mod[0]);
+
+	localparam	FD = 32;
+
+	initial	f_cs_n = {(FD){1'b1}};
+	initial	f_sck  = {(2*FD){1'b1}};
+	initial	f_qdat = {(4*FD){1'b1}};
+	initial	f_dir  = {(FD){1'b1}};
+	always @(posedge i_clk)
+		if ((!f_past_valid)||(i_reset)||(maintenance))
+		begin
+			f_cs_n <= {(FD){1'b1}};
+			f_sck  <= {(2*FD){1'b1}};
+			f_qdat <= {(4*FD){1'b1}};
+			f_dir  <= {(FD){1'b1}};
+		end else if ((f_past_valid)&&(!$past(o_wb_stall))&&($past(o_wb_cyc)))
+		begin
+			f_cs_n <= {(FD){1'b1}};
+			f_sck  <= {(2*FD){1'b1}};
+			f_qdat <= {(4*FD){1'b1}};
+			f_dir  <= {(FD){1'b1}};
+		end else begin
+			f_cs_n <= { f_cs_n[  (FD-2):0], o_qspi_cs_n };
+			f_sck  <= { f_sck[ (2*FD-3):0],  o_qspi_sck  };
+			f_qdat <= { f_qdat[(4*FD-5):0],
+					(f_rd) ? i_qspi_dat : o_qspi_dat };
+			f_dir  <= { f_dir[   (FD-2):0],  f_wr };
+		end
+
+	always @(posedge i_clk)
+		if (f_sck[3:2] == 2'b11)
+		begin
+			asssert(f_cs_n[1]);
+			assert((f_sck[1:0] == 2'b10)||(f_sck[1:0] == 2'b11));
+			assert(f_cs_n[0] == f_sck[0]);
+		end else if (f_sck[3:2] == 2'b10)
+		begin
+			assert(f_cs_n[1:0] == 2'b00);
+			assert(f_sck[1:0] == 2'b01)
+		end else if (f_sck[3:2] == 2'b01);
+		begin
+			assert(f_cs_n[1:0] == 2'b01);
+			assert(f_sck[1:0] == 2'b11);
+		else
+			// Should *NEVER* be here.
+			assert(f_sck[3:2] != 2'b00);
+
+	always @(posedge i_clk)
+		for(k=2; k<32; k=k+1)
+			if (f_cs_n[k:(k-1)]==2'b10)
+				assert(f_cs_n[(k-1):0] == 0);
+
+
+	initial	f_phase <= 0;
+	always @(posedge i_clk)
+		if (o_qspi_cs_n)
+			f_phase <= 0;
+		else if (f_phase == 4'hc)
+			f_phase <= 4'h2;
+		else
+			f_phase <= f_phase + 1'b1;
+
+`endif
 endmodule
+// Originally:			   (XPRS)
+//   Number of wires:                135
+//   Number of wire bits:            556
+//   Number of public wires:          30
+//   Number of public wire bits:     265
+//   Number of memories:               0
+//   Number of memory bits:            0
+//   Number of processes:              0	(R/O)	(FULL)
+//   Number of cells:                413	889	1248
+//     FDRE                          168	231	 281
+//     LUT1                            6	 23	  23
+//     LUT2                           61	 83	 203
+//     LUT3                           60	 67	 166
+//     LUT4                            9	 29	  57
+//     LUT5                            6	 50	  95
+//     LUT6                           24	215	 256
+//     MUXCY                          35	 59	  59
+//     MUXF7                           5	 60	  31
+//     MUXF8                           2	  5	  10
+//     XORCY                          37	 67	  67
 

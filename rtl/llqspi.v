@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	llqspi.v
 //
@@ -10,12 +10,12 @@
 //		When not in use, unlike our previous SPI work, no bits will
 //		toggle.
 //
-// Creator:	Dan Gisselquist
+// Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -28,7 +28,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -36,7 +36,11 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+//
+`default_nettype	none
+//
 `define	QSPI_IDLE	3'h0
 `define	QSPI_START	3'h1
 `define	QSPI_BITS	3'h2
@@ -56,17 +60,17 @@ module	llqspi(i_clk,
 			o_word, o_valid, o_busy,
 		// QSPI interface
 		o_sck, o_cs_n, o_mod, o_dat, i_dat);
-	input			i_clk;
+	input	wire		i_clk;
 	// Chip interface
 	//	Can send info
 	//		i_dir = 1, i_spd = 0, i_hold = 0, i_wr = 1,
 	//			i_word = { 1'b0, 32'info to send },
 	//			i_len = # of bytes in word-1
-	input			i_wr, i_hold;
-	input		[31:0]	i_word;
-	input		[1:0]	i_len;	// 0=>8bits, 1=>16 bits, 2=>24 bits, 3=>32 bits
-	input			i_spd; // 0 -> normal QPI, 1 -> QSPI
-	input			i_dir; // 0 -> read, 1 -> write to SPI
+	input	wire		i_wr, i_hold;
+	input	wire	[31:0]	i_word;
+	input	wire	[1:0]	i_len;	// 0=>8bits, 1=>16 bits, 2=>24 bits, 3=>32 bits
+	input	wire		i_spd; // 0 -> normal QPI, 1 -> QSPI
+	input	wire		i_dir; // 0 -> read, 1 -> write to SPI
 	output	reg	[31:0]	o_word;
 	output	reg		o_valid, o_busy;
 	// Interface with the QSPI lines

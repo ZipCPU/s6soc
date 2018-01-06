@@ -80,7 +80,6 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 
 	initial	r_busy = 1'b1;
 	initial	state  = `TXU_IDLE;
-	initial	lcl_data= 8'h0;
 	always @(posedge i_clk)
 	begin
 		if (!zero_baud_counter)

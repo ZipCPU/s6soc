@@ -12,7 +12,7 @@
 //	faster than the single instruction prefetch, although not as fast as
 //	the prefetch and cache found elsewhere.
 //
-//	There are some gotcha's in this logic, however.  For example, it's 
+//	There are some gotcha's in this logic, however.  For example, it's
 //	illegal to switch devices mid-transaction, since the second device
 //	might have different timing.  I.e. the first device might take 8
 //	clocks to create an ACK, and the second device might take 2 clocks, the
@@ -58,27 +58,30 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-module	dblfetch(i_clk, i_rst, i_new_pc, i_clear_cache,
-			i_stall_n, i_pc, o_i, o_pc, o_v,
+`default_nettype	none
+//
+module	dblfetch(i_clk, i_reset, i_new_pc, i_clear_cache,
+			i_stall_n, i_pc, o_insn, o_pc, o_valid,
 		o_wb_cyc, o_wb_stb, o_wb_we, o_wb_addr, o_wb_data,
 			i_wb_ack, i_wb_stall, i_wb_err, i_wb_data,
 		o_illegal);
 	parameter		ADDRESS_WIDTH=32, AUX_WIDTH = 1;
-	localparam		AW=ADDRESS_WIDTH;
-	input				i_clk, i_rst, i_new_pc, i_clear_cache,
+	parameter	[0:0]	F_OPT_CLK2FFLOGIC=1'b0;
+	localparam		AW=ADDRESS_WIDTH, DW = 32;
+	input	wire			i_clk, i_reset, i_new_pc, i_clear_cache,
 						i_stall_n;
-	input		[(AW-1):0]	i_pc;
-	output	reg	[31:0]		o_i;
+	input	wire	[(AW-1):0]	i_pc;
+	output	reg	[(DW-1):0]	o_insn;
 	output	reg	[(AW-1):0]	o_pc;
-	output	wire			o_v;
+	output	wire			o_valid;
 	// Wishbone outputs
 	output	reg			o_wb_cyc, o_wb_stb;
 	output	wire			o_wb_we;
 	output	reg	[(AW-1):0]	o_wb_addr;
-	output	wire	[31:0]		o_wb_data;
+	output	wire	[(DW-1):0]	o_wb_data;
 	// And return inputs
-	input			i_wb_ack, i_wb_stall, i_wb_err;
-	input		[31:0]	i_wb_data;
+	input	wire			i_wb_ack, i_wb_stall, i_wb_err;
+	input	wire	[(DW-1):0]	i_wb_data;
 	// And ... the result if we got an error
 	output	reg		o_illegal;
 
@@ -87,53 +90,36 @@ module	dblfetch(i_clk, i_rst, i_new_pc, i_clear_cache,
 
 	reg	last_ack, last_stb, invalid_bus_cycle;
 
-	reg	[31:0]		cache	[0:1];
-	reg	cache_read_addr, cache_write_addr;
+	reg	[(DW-1):0]	cache	[0:1];
+	reg			cache_read_addr, cache_write_addr;
 	reg	[1:0]		cache_valid;
 
 	initial	o_wb_cyc = 1'b0;
 	initial	o_wb_stb = 1'b0;
 	always @(posedge i_clk)
-		if ((i_rst)||(i_wb_err))
+		if ((i_reset)||((o_wb_cyc)&&(i_wb_err)))
 		begin
 			o_wb_cyc <= 1'b0;
 			o_wb_stb <= 1'b0;
-			// last_stb <= 1'b0;
-			// last_ack <= 1'b0;
 		end else if (o_wb_cyc)
 		begin
 			if ((o_wb_stb)&&(!i_wb_stall))
-			begin
-				// last_stb <= 1'b1;
-				o_wb_stb <= !last_stb;
-			end
-			// if (i_wb_ack)
-			//	last_ack <= 1'b1;
-			if ((i_new_pc)||(invalid_bus_cycle))
-				o_wb_stb <= 1'b0;
+				o_wb_stb <= (!last_stb);
 
-			if ((i_wb_ack)&&(
-				// Relase the bus on the second ack
-				(last_ack)
-				// Or on the first ACK, if we've been told
-				// we have an invalid bus cycle
-				||((o_wb_stb)&&(i_wb_stall)&&(last_stb)&&(
-					(i_new_pc)||(invalid_bus_cycle)))
-				))
+			// Relase the bus on the second ack
+			if (((i_wb_ack)&&(last_ack))
+				// Or any new transaction request
+				||((i_new_pc)||(i_clear_cache)))
 			begin
 				o_wb_cyc <= 1'b0;
 				o_wb_stb <= 1'b0;
 			end
 
-			if ((!last_stb)&&(i_wb_stall)&&((i_new_pc)||(invalid_bus_cycle)))
-				// Also release the bus with no acks, if we
-				// haven't made any requests
-			begin
-				o_wb_cyc <= 1'b0;
-				o_wb_stb <= 1'b0;
-			end
-		end else if ((invalid_bus_cycle)
-			||((o_v)&&(i_stall_n)&&(cache_read_addr))) // Initiate a bus cycle
+		end else if ((invalid_bus_cycle)||(i_new_pc)
+			||((o_valid)&&(i_stall_n)&&(cache_read_addr)))
+			// Initiate a bus cycle if ... the last bus cycle was
+			// aborted, we've been given a new PC to go get, or
+			// we just exhausted our two instruction cache
 		begin
 			o_wb_cyc <= 1'b1;
 			o_wb_stb <= 1'b1;
@@ -143,27 +129,23 @@ module	dblfetch(i_clk, i_rst, i_new_pc, i_clear_cache,
 
 	initial	last_stb = 1'b0;
 	always @(posedge i_clk)
-		if ((o_wb_cyc)&&(o_wb_stb)&&(!i_wb_stall))
-			last_stb <= 1'b1;
-		else if (!o_wb_cyc)
+		if (o_wb_stb)
+		begin
+			if (!i_wb_stall)
+				last_stb <= 1'b1;
+		end else
 			last_stb <= 1'b0;
 
 	initial	last_ack = 1'b0;
 	always @(posedge i_clk)
-		if ((o_wb_cyc)&&(i_wb_ack))
-			last_ack <= 1'b1;
-		else if ((o_wb_cyc)&&(o_wb_stb)&&(i_wb_stall)&&(
-				(i_new_pc)||(invalid_bus_cycle)))
-			last_ack <= 1'b1;
-		else if ((o_wb_cyc)&&(o_wb_stb)&&(!i_wb_stall)&&(!last_stb)&&(
-				(i_new_pc)||(invalid_bus_cycle)))
-			last_ack <= 1'b1;
-		else if (!o_wb_cyc)
+		if (!o_wb_cyc)
 			last_ack <= 1'b0;
+		else if (i_wb_ack)
+			last_ack <= 1'b1;
 
 	initial	invalid_bus_cycle = 1'b0;
 	always @(posedge i_clk)
-		if (i_rst)
+		if (i_reset)
 			invalid_bus_cycle <= 1'b0;
 		else if ((i_new_pc)||(i_clear_cache))
 			invalid_bus_cycle <= 1'b1;
@@ -174,8 +156,11 @@ module	dblfetch(i_clk, i_rst, i_new_pc, i_clear_cache,
 	always @(posedge i_clk)
 		if (i_new_pc)
 			o_wb_addr <= i_pc;
-		else if ((o_wb_stb)&&(!i_wb_stall)&&(!invalid_bus_cycle))
-			o_wb_addr <= o_wb_addr + 1'b1;
+		else if (o_wb_stb)
+		begin
+			if ((!i_wb_stall)&&(!invalid_bus_cycle))
+				o_wb_addr <= o_wb_addr + 1'b1;
+		end
 
 	initial	cache_write_addr = 1'b0;
 	always @(posedge i_clk)
@@ -191,36 +176,39 @@ module	dblfetch(i_clk, i_rst, i_new_pc, i_clear_cache,
 	initial	cache_read_addr = 1'b0;
 	always @(posedge i_clk)
 		if ((i_new_pc)||(invalid_bus_cycle)
-				||((o_v)&&(cache_read_addr)&&(i_stall_n)))
+				||((o_valid)&&(cache_read_addr)&&(i_stall_n)))
 			cache_read_addr <= 1'b0;
-		else if ((o_v)&&(i_stall_n))
+		else if ((o_valid)&&(i_stall_n))
 			cache_read_addr <= 1'b1;
 
+	initial	cache_valid = 2'b00;
 	always @(posedge i_clk)
-		if ((i_new_pc)||(invalid_bus_cycle))
+		if ((i_reset)||(i_new_pc)||(invalid_bus_cycle))
 			cache_valid <= 2'b00;
 		else begin
-			if ((o_v)&&(i_stall_n))
+			if ((o_valid)&&(i_stall_n))
 				cache_valid[cache_read_addr] <= 1'b0;
 			if ((o_wb_cyc)&&(i_wb_ack))
 				cache_valid[cache_write_addr] <= 1'b1;
 		end
 
-	initial	o_i = {(32){1'b1}};
+	initial	o_insn = {(32){1'b1}};
 	always @(posedge i_clk)
-		if ((i_stall_n)&&(o_wb_cyc)&&(i_wb_ack))
-			o_i <= i_wb_data;
-		else
-			o_i <= cache[cache_read_addr];
+		if (((i_stall_n)||(!o_valid))&&(o_wb_cyc)&&(i_wb_ack))
+			o_insn <= i_wb_data;
+		else if (!o_valid)
+			o_insn <= cache[cache_read_addr];
+		else if (i_stall_n)
+			o_insn <= cache[cache_read_addr^1];
 
 	initial	o_pc = 0;
 	always @(posedge i_clk)
 		if (i_new_pc)
 			o_pc <= i_pc;
-		else if ((o_v)&&(i_stall_n))
+		else if ((o_valid)&&(i_stall_n))
 			o_pc <= o_pc + 1'b1;
 
-	assign	o_v = cache_valid[cache_read_addr];
+	assign	o_valid = cache_valid[cache_read_addr];
 
 	initial	o_illegal = 1'b0;
 	always @(posedge i_clk)

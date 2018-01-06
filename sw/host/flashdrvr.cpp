@@ -4,10 +4,11 @@
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
-// Purpose:	Flash driver.  Encapsulate writing to the flash device.
+// Purpose:	Flash driver.  Encapsulates the erasing and programming (i.e.
+//		writing) necessary to set the values in a flash device.
 //
-// Creator:	Dan Gisselquist
-//		Gisselquist Tecnology, LLC
+// Creator:	Dan Gisselquist, Ph.D.
+//		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
 //

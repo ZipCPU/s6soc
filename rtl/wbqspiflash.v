@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	wbspiflash.v
+// Filename:	wbspiflash.v
 //
 // Project:	CMod S6 System on a Chip, ZipCPU demonstration project
 //
@@ -22,7 +22,7 @@
 //	2: Status register (R/w)
 //	3: Read ID (read only)
 //	(19 bits): Data (R/w, but expect writes to take a while)
-//		
+//
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -55,41 +55,41 @@
 //
 `include "flashconfig.v"
 //
-`define	WBQSPI_RESET		0
-`define	WBQSPI_RESET_QUADMODE	1
-`define	WBQSPI_IDLE		2
-`define	WBQSPI_RDIDLE		3	// Idle, but in fast read mode
-`define	WBQSPI_WBDECODE		4
-`define	WBQSPI_RD_DUMMY		5
-`define	WBQSPI_QRD_ADDRESS	6
-`define	WBQSPI_QRD_DUMMY	7
-`define	WBQSPI_READ_CMD		8
-`define	WBQSPI_READ_DATA	9
-`define	WBQSPI_WAIT_TIL_RDIDLE	10
-`define	WBQSPI_READ_ID_CMD	11
-`define	WBQSPI_READ_ID		12
-`define	WBQSPI_READ_STATUS	13
-`define	WBQSPI_READ_CONFIG	14
-`define	WBQSPI_WAIT_TIL_IDLE	15
+`define	WBQSPI_RESET		5'd0
+`define	WBQSPI_RESET_QUADMODE	5'd1
+`define	WBQSPI_IDLE		5'd2
+`define	WBQSPI_RDIDLE		5'd3	// Idle, but in fast read mode
+`define	WBQSPI_WBDECODE		5'd4
+`define	WBQSPI_RD_DUMMY		5'd5
+`define	WBQSPI_QRD_ADDRESS	5'd6
+`define	WBQSPI_QRD_DUMMY	5'd7
+`define	WBQSPI_READ_CMD		5'd8
+`define	WBQSPI_READ_DATA	5'd9
+`define	WBQSPI_WAIT_TIL_RDIDLE	5'd10
+`define	WBQSPI_READ_ID_CMD	5'd11
+`define	WBQSPI_READ_ID		5'd12
+`define	WBQSPI_READ_STATUS	5'd13
+`define	WBQSPI_READ_CONFIG	5'd14
+`define	WBQSPI_WAIT_TIL_IDLE	5'd15
 //
 //
 `ifndef	READ_ONLY
 //
-`define	WBQSPI_WAIT_WIP_CLEAR	16
-`define	WBQSPI_CHECK_WIP_CLEAR	17
-`define	WBQSPI_CHECK_WIP_DONE	18
-`define	WBQSPI_WEN		19
-`define	WBQSPI_PP		20	// Program page
-`define	WBQSPI_QPP		21	// Program page, 4 bit mode
-`define	WBQSPI_WR_DATA		22
-`define	WBQSPI_WR_BUS_CYCLE	23
-`define	WBQSPI_WRITE_STATUS	24
-`define	WBQSPI_WRITE_CONFIG	25
-`define	WBQSPI_ERASE_WEN	26
-`define	WBQSPI_ERASE_CMD	27
-`define	WBQSPI_ERASE_BLOCK	28
-`define	WBQSPI_CLEAR_STATUS	29
-`define	WBQSPI_IDLE_CHECK_WIP	30
+`define	WBQSPI_WAIT_WIP_CLEAR	5'd16
+`define	WBQSPI_CHECK_WIP_CLEAR	5'd17
+`define	WBQSPI_CHECK_WIP_DONE	5'd18
+`define	WBQSPI_WEN		5'd19
+`define	WBQSPI_PP		5'd20	// Program page
+`define	WBQSPI_QPP		5'd21	// Program page, 4 bit mode
+`define	WBQSPI_WR_DATA		5'd22
+`define	WBQSPI_WR_BUS_CYCLE	5'd23
+`define	WBQSPI_WRITE_STATUS	5'd24
+`define	WBQSPI_WRITE_CONFIG	5'd25
+`define	WBQSPI_ERASE_WEN	5'd26
+`define	WBQSPI_ERASE_CMD	5'd27
+`define	WBQSPI_ERASE_BLOCK	5'd28
+`define	WBQSPI_CLEAR_STATUS	5'd29
+`define	WBQSPI_IDLE_CHECK_WIP	5'd30
 //
 `endif
 
@@ -104,11 +104,11 @@ module	wbqspiflash(i_clk_100mhz,
 		o_interrupt);
 	parameter	ADDRESS_WIDTH=22;
 	localparam	AW = ADDRESS_WIDTH-2;
-	input			i_clk_100mhz;
+	input	wire		i_clk_100mhz;
 	// Wishbone, inputs first
-	input			i_wb_cyc, i_wb_data_stb, i_wb_ctrl_stb, i_wb_we;
-	input		[(AW-1):0]	i_wb_addr;
-	input		[31:0]	i_wb_data;
+	input	wire		i_wb_cyc, i_wb_data_stb, i_wb_ctrl_stb, i_wb_we;
+	input	wire	[(AW-1):0]	i_wb_addr;
+	input	wire	[31:0]	i_wb_data;
 	// then outputs
 	output	reg		o_wb_ack;
 	output	reg		o_wb_stall;
@@ -117,7 +117,7 @@ module	wbqspiflash(i_clk_100mhz,
 	output	wire		o_qspi_sck, o_qspi_cs_n;
 	output	wire	[1:0]	o_qspi_mod;
 	output	wire	[3:0]	o_qspi_dat;
-	input		[3:0]	i_qspi_dat;
+	input	wire	[3:0]	i_qspi_dat;
 	// Interrupt line
 	output	reg		o_interrupt;
 	// output	wire	[31:0]	o_debug;
@@ -148,13 +148,30 @@ module	wbqspiflash(i_clk_100mhz,
 		write_protect = 1'b1;
 	end
 
+	wire	[23:0]	w_wb_addr;
+	generate
+	if (ADDRESS_WIDTH>=24)
+		assign w_wb_addr = { i_wb_addr[21:0], 2'b00 };
+	else
+		assign w_wb_addr = { {(24-ADDRESS_WIDTH){1'b0}}, i_wb_addr, 2'b00 };
+	endgenerate
+
+	// Repeat for spif_addr
+	reg	[(ADDRESS_WIDTH-3):0]	spif_addr;
+	wire	[23:0]	w_spif_addr;
+	generate
+	if (ADDRESS_WIDTH>=24)
+		assign w_spif_addr = { spif_addr[21:0], 2'b00 };
+	else
+		assign w_spif_addr = { {(24-ADDRESS_WIDTH){1'b0}}, spif_addr, 2'b00 };
+	endgenerate
+
 	reg	[7:0]	last_status;
 	reg	[9:0]	reset_counter;
 	reg		quad_mode_enabled;
 	reg		spif_cmd, spif_override;
-	reg	[(AW-1):0]	spif_addr;
 	reg	[31:0]	spif_data;
-	reg	[5:0]	state;
+	reg	[4:0]	state;
 	reg		spif_ctrl, spif_req;
 	reg		alt_cmd, alt_ctrl;
 	wire	[(ADDRESS_WIDTH-17):0]	spif_sector;
@@ -281,15 +298,11 @@ module	wbqspiflash(i_clk_100mhz,
 				spi_wr     <= 1'b1;	// Write cmd to device
 				if (quad_mode_enabled)
 				begin
-					spi_in <= { 8'heb,
-						{(24-ADDRESS_WIDTH){1'b0}},
-						i_wb_addr[(AW-1):0], 2'b00 };
+					spi_in <= { 8'heb, w_wb_addr };
 					state <= `WBQSPI_QRD_ADDRESS;
 					spi_len    <= 2'b00; // single byte, cmd only
 				end else begin
-					spi_in <= { 8'h0b,
-						{(24-ADDRESS_WIDTH){1'b0}},
-						i_wb_addr[(AW-1):0], 2'b00 };
+					spi_in <= { 8'h0b, w_wb_addr };
 					state <= `WBQSPI_RD_DUMMY;
 					spi_len    <= 2'b11; // cmd+addr,32bits
 				end
@@ -311,10 +324,10 @@ module	wbqspiflash(i_clk_100mhz,
 			o_wb_stall <= 1'b1;
 			case(i_wb_addr[1:0])
 			2'b00: begin // Erase command register
-				write_protect <= ~i_wb_data[28];
+				write_protect <= !i_wb_data[28];
 				o_wb_stall <= 1'b0;
 
-				if((i_wb_data[31])&&(~write_in_progress))
+				if((i_wb_data[31])&&(!write_in_progress))
 				begin
 					// Command an erase--ack it immediately
 
@@ -368,7 +381,7 @@ module	wbqspiflash(i_clk_100mhz,
 				end
 			endcase
 `endif
-		end else if (i_wb_ctrl_stb) // &&(~i_wb_we))
+		end else if (i_wb_ctrl_stb) // &&(!i_wb_we))
 		begin
 			case(i_wb_addr[1:0])
 			2'b00: begin // Read local register
@@ -444,15 +457,14 @@ module	wbqspiflash(i_clk_100mhz,
 		spi_hold <= 1'b0;
 		spi_spd<= 1'b1;
 		spi_dir <= 1'b0; // Write (for now)
-		if ((i_wb_data_stb)&&(~i_wb_we))
+		if ((i_wb_data_stb)&&(!i_wb_we))
 		begin // Continue our read ... send the new address / mode
 			o_wb_stall <= 1'b1;
 			spi_wr <= 1'b1;
 			spi_len <= 2'b10; // Write address, but not mode byte
-			spi_in <= { {(24-ADDRESS_WIDTH){1'b0}},
-					i_wb_addr[(AW-1):0], 2'b00, 8'ha0 };
+			spi_in <= { w_wb_addr, 8'ha0 };
 			state <= `WBQSPI_QRD_DUMMY;
-		end else if((i_wb_ctrl_stb)&&(~i_wb_we)&&(i_wb_addr[1:0] == 2'b00))
+		end else if((i_wb_ctrl_stb)&&(!i_wb_we)&&(i_wb_addr[1:0] == 2'b00))
 		begin
 			// A local read that doesn't touch the device, so leave
 			// the device in its current state
@@ -507,7 +519,7 @@ module	wbqspiflash(i_clk_100mhz,
 						// Send a write enable command
 						spi_in <= { 8'h06, 24'h00 };
 						state <= `WBQSPI_WEN;
-	
+
 						o_wb_ack <= 1'b0;
 						o_wb_stall <= 1'b1;
 					end else if (write_protect)
@@ -648,7 +660,7 @@ module	wbqspiflash(i_clk_100mhz,
 		spi_spd <= 1'b0;
 		spi_hold <= 1'b0;
 		spif_req<= (spif_req) && (i_wb_cyc);
-		
+
 		if ((~spi_busy)&&(~o_qspi_cs_n))
 			// Our command was accepted
 			state <= `WBQSPI_READ_CMD;
@@ -661,14 +673,13 @@ module	wbqspiflash(i_clk_100mhz,
 		o_wb_stall <= 1'b1;
 
 		spi_wr <= 1'b1; // Non-stop
-		spi_in <= { {(24-ADDRESS_WIDTH){1'b0}},
-				spif_addr[(AW-1):0], 2'b00, 8'ha0 };
+		spi_in <= { w_spif_addr, 8'ha0 };
 		spi_len <= 2'b10; // Write address, not mode byte
 		spi_spd <= 1'b1;
 		spi_dir <= 1'b0; // Still writing
 		spi_hold <= 1'b0;
 		spif_req<= (spif_req) && (i_wb_cyc);
-		
+
 		if ((~spi_busy)&&(spi_spd))
 			// Our command was accepted
 			state <= `WBQSPI_QRD_DUMMY;
@@ -679,12 +690,12 @@ module	wbqspiflash(i_clk_100mhz,
 
 		spi_wr <= 1'b1; // Non-stop
 		spi_in <= { 8'ha0, 24'h00 }; // Mode byte, then 2 bytes dummy
-		spi_len <= 2'b10; // Write 8 bits
+		spi_len <= 2'b10; // Write 24 bits
 		spi_spd <= 1'b1;
 		spi_dir <= 1'b0; // Still writing
 		spi_hold <= 1'b0;
 		spif_req<= (spif_req) && (i_wb_cyc);
-		
+
 		if ((~spi_busy)&&(spi_in[31:28] == 4'ha))
 			// Our command was accepted
 			state <= `WBQSPI_READ_CMD;
@@ -728,7 +739,7 @@ module	wbqspiflash(i_clk_100mhz,
 			o_wb_ack <= spif_req;
 			o_wb_stall <= (~spi_wr);
 			// adjust endian-ness to match the PC
-			o_wb_data <= spi_out; 
+			o_wb_data <= spi_out;
 			state <= (spi_wr)?`WBQSPI_READ_DATA
 				: ((spi_spd) ? `WBQSPI_WAIT_TIL_RDIDLE : `WBQSPI_WAIT_TIL_IDLE);
 			spif_req <= spi_wr;
@@ -756,7 +767,7 @@ module	wbqspiflash(i_clk_100mhz,
 		if ((~spi_busy)&&(o_qspi_cs_n)&&(~spi_wr)) // Wait for a full
 		begin // clearing of the SPI port before moving on
 			state <= `WBQSPI_RDIDLE;
-			o_wb_stall <= 1'b0; 
+			o_wb_stall <= 1'b0;
 			o_wb_ack   <= 1'b0;// Shouldn't be acking anything here
 		end
 	end else if (state == `WBQSPI_READ_ID_CMD)
@@ -915,15 +926,11 @@ module	wbqspiflash(i_clk_100mhz,
 				spi_wr     <= 1'b1;	// Write cmd to device
 				if (quad_mode_enabled)
 				begin
-					spi_in <= { 8'heb,
-						{(24-ADDRESS_WIDTH){1'b0}},
-						spif_addr[(AW-1):0], 2'b00 };
+					spi_in <= { 8'heb, w_spif_addr };
 					state <= `WBQSPI_QRD_ADDRESS;
 					// spi_len    <= 2'b00; // single byte, cmd only
 				end else begin
-					spi_in <= { 8'h0b,
-						{(24-ADDRESS_WIDTH){1'b0}},
-						spif_addr[(AW-1):0], 2'b00 };
+					spi_in <= { 8'h0b, w_spif_addr };
 					state <= `WBQSPI_RD_DUMMY;
 					spi_len    <= 2'b11; // Send cmd and addr
 				end end
@@ -971,9 +978,7 @@ module	wbqspiflash(i_clk_100mhz,
 	begin // We come here under a full stop / full port idle mode
 		// Issue our command immediately
 		spi_wr <= 1'b1;
-		spi_in <= { 8'h02,
-				{(24-ADDRESS_WIDTH){1'b0}},
-				spif_addr[(AW-1):0], 2'b00 };
+		spi_in <= { 8'h02, w_spif_addr };
 		spi_len <= 2'b11;
 		spi_hold <= 1'b1;
 		spi_spd  <= 1'b0;
@@ -989,9 +994,7 @@ module	wbqspiflash(i_clk_100mhz,
 	begin // We come here under a full stop / full port idle mode
 		// Issue our command immediately
 		spi_wr <= 1'b1;
-		spi_in <= { 8'h32,
-				{(24-ADDRESS_WIDTH){1'b0}},
-				spif_addr[(AW-1):0], 2'b00 };
+		spi_in <= { 8'h32, w_spif_addr };
 		spi_len <= 2'b11;
 		spi_hold <= 1'b1;
 		spi_spd  <= 1'b0;
@@ -1156,7 +1159,7 @@ module	wbqspiflash(i_clk_100mhz,
 		spif_req <= (spif_req) && (i_wb_cyc);
 
 		// Stay in this mode unless/until we get a command, or
-		// 	the write is over
+		//	the write is over
 		spi_wr <= (((~i_wb_cyc)||((~i_wb_data_stb)&&(~i_wb_ctrl_stb)))
 				&&(write_in_progress));
 		spi_len <= 2'b00; // 8 bit reads
@@ -1187,7 +1190,7 @@ module	wbqspiflash(i_clk_100mhz,
 		if ((~spi_busy)&&(o_qspi_cs_n)&&(~spi_wr)) // Wait for a full
 		begin // clearing of the SPI port before moving on
 			state <= `WBQSPI_IDLE;
-			o_wb_stall <= 1'b0; 
+			o_wb_stall <= 1'b0;
 			o_wb_ack   <= 1'b0; // Shouldn't be acking anything here
 		end
 	end

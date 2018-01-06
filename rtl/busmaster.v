@@ -551,7 +551,7 @@ module	busmaster(i_clk, i_rst,
 	//
 `ifdef	FLASH_ACCESS
 `ifdef	LOWLOGIC_FLASH
-	qflashxpress	flashmem(i_clk,
+	qflashxpress	flashmem(i_clk, 1'b0,
 		wb_cyc,(wb_stb)&&(flash_sel),
 			wb_addr[(LGFLASHSZ-3):0],
 		flash_ack, flash_stall, flash_data,

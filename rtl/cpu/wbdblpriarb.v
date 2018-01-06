@@ -68,6 +68,8 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
+//
 module	wbdblpriarb(i_clk, i_rst,
 	// Bus A
 	i_a_cyc_a,i_a_cyc_b,i_a_stb_a,i_a_stb_b,i_a_we,i_a_adr, i_a_dat, i_a_sel, o_a_ack, o_a_stall, o_a_err,
@@ -79,25 +81,25 @@ module	wbdblpriarb(i_clk, i_rst,
 	parameter			DW=32, AW=32;
 	// Wishbone doesn't use an i_ce signal.  While it could, they dislike
 	// what it would (might) do to the synchronous reset signal, i_rst.
-	input				i_clk, i_rst;
+	input	wire			i_clk, i_rst;
 	// Bus A
-	input				i_a_cyc_a, i_a_cyc_b, i_a_stb_a, i_a_stb_b, i_a_we;
-	input		[(AW-1):0]	i_a_adr;
-	input		[(DW-1):0]	i_a_dat;
-	input		[(DW/8-1):0]	i_a_sel;
+	input	wire			i_a_cyc_a, i_a_cyc_b, i_a_stb_a, i_a_stb_b, i_a_we;
+	input	wire	[(AW-1):0]	i_a_adr;
+	input	wire	[(DW-1):0]	i_a_dat;
+	input	wire	[(DW/8-1):0]	i_a_sel;
 	output	wire			o_a_ack, o_a_stall, o_a_err;
 	// Bus B
-	input				i_b_cyc_a, i_b_cyc_b, i_b_stb_a, i_b_stb_b, i_b_we;
-	input		[(AW-1):0]	i_b_adr;
-	input		[(DW-1):0]	i_b_dat;
-	input		[(DW/8-1):0]	i_b_sel;
+	input	wire			i_b_cyc_a, i_b_cyc_b, i_b_stb_a, i_b_stb_b, i_b_we;
+	input	wire	[(AW-1):0]	i_b_adr;
+	input	wire	[(DW-1):0]	i_b_dat;
+	input	wire	[(DW/8-1):0]	i_b_sel;
 	output	wire			o_b_ack, o_b_stall, o_b_err;
 	//
 	output	wire			o_cyc_a,o_cyc_b, o_stb_a, o_stb_b, o_we;
 	output	wire	[(AW-1):0]	o_adr;
 	output	wire	[(DW-1):0]	o_dat;
 	output	wire	[(DW/8-1):0]	o_sel;
-	input				i_ack, i_stall, i_err;
+	input	wire			i_ack, i_stall, i_err;
 
 	// All of our logic is really captured in the 'r_a_owner' register.
 	// This register determines who owns the bus.  If no one is requesting
@@ -107,15 +109,54 @@ module	wbdblpriarb(i_clk, i_rst,
 	//
 	// The CYC logic is here to make certain that, by the time we determine
 	// who the bus owner is, we can do so based upon determined criteria.
+	reg	r_a_owner;
+
 	assign o_cyc_a = ((r_a_owner) ? i_a_cyc_a : i_b_cyc_a);
 	assign o_cyc_b = ((r_a_owner) ? i_a_cyc_b : i_b_cyc_b);
-	reg	r_a_owner;
 	initial	r_a_owner = 1'b1;
 	always @(posedge i_clk)
 		if (i_rst)
 			r_a_owner <= 1'b1;
-		else if ((~o_cyc_a)&&(~o_cyc_b))
-			r_a_owner <= ((i_b_cyc_a)||(i_b_cyc_b))? 1'b0:1'b1;
+		/*
+		// Remain with the "last owner" until 1) the other bus requests
+		// access, and 2) the last owner no longer wants it.  This
+		// logic "idles" on the last owner.
+		//
+		// This is an alternating bus owner strategy
+		//
+		else if ((!o_cyc_a)&&(!o_cyc_b))
+			r_a_owner <= ((i_b_stb_a)||(i_b_stb_b))? 1'b0:1'b1;
+		//
+		// Expanding this out
+		//
+		// else if ((r_a_owner)&&((i_a_cyc_a)||(i_a_cyc_b)))
+		//		r_a_owner <= 1'b1;
+		// else if ((!r_a_owner)&&((i_b_cyc_a)||(i_b_cyc_b)))
+		//		r_a_owner <= 1'b0;
+		// else if ((r_a_owner)&&((i_b_stb_a)||(i_b_stb_b)))
+		//		r_a_owner <= 1'b0;
+		// else if ((!r_a_owner)&&((i_a_stb_a)||(i_a_stb_b)))
+		//		r_a_owner <= 1'b0;
+		//
+		// Logic required:
+		//
+		//	Reset line
+		//	+ 9 inputs (data)
+		//	+ 9 inputs (CE)
+		//	Could be done with three LUTs
+		//		First two evaluate o_cyc_a and o_cyc_b (above)
+		*/
+		// Option 2:
+		//
+		// "Idle" on A as the owner.
+		// If a request is made from B, AND A is idle, THEN
+		// switch.  Otherwise, if B is ever idle, revert back to A
+		// regardless of whether A wants it or not.
+		else if ((!i_b_cyc_a)&&(!i_b_cyc_b))
+			r_a_owner <= 1'b1;
+		else if ((!i_a_cyc_a)&&(!i_a_cyc_b)
+				&&((i_b_stb_a)||(i_b_stb_b)))
+			r_a_owner <= 1'b0;
 
 
 	assign o_we    = (r_a_owner) ? i_a_we    : i_b_we;
@@ -129,19 +170,19 @@ module	wbdblpriarb(i_clk, i_rst,
 	// staring at wires and dumps and such.
 	//
 	wire	o_cyc, o_stb;
-	assign	o_cyc = ((o_cyc_a)||(o_cyc_b));
-	assign	o_stb = (o_cyc)&&((o_stb_a)||(o_stb_b));
-	assign o_stb_a = (r_a_owner) ? (i_a_stb_a)&&(o_cyc_a) : (i_b_stb_a)&&(o_cyc_a);
-	assign o_stb_b = (r_a_owner) ? (i_a_stb_b)&&(o_cyc_b) : (i_b_stb_b)&&(o_cyc_b);
-	assign o_adr   = ((o_stb_a)|(o_stb_b))?((r_a_owner) ? i_a_adr   : i_b_adr):0;
-	assign o_dat   = (o_stb)?((r_a_owner) ? i_a_dat   : i_b_dat):0;
-	assign o_sel   = (o_stb)?((r_a_owner) ? i_a_sel   : i_b_sel):0;
-	assign o_a_ack   = (o_cyc)&&( r_a_owner) ? i_ack   : 1'b0;
-	assign o_b_ack   = (o_cyc)&&(~r_a_owner) ? i_ack   : 1'b0;
+	assign	o_cyc     = ((o_cyc_a)||(o_cyc_b));
+	assign	o_stb     = (o_cyc)&&((o_stb_a)||(o_stb_b));
+	assign	o_stb_a   = (r_a_owner) ? (i_a_stb_a)&&(o_cyc_a) : (i_b_stb_a)&&(o_cyc_a);
+	assign	o_stb_b   = (r_a_owner) ? (i_a_stb_b)&&(o_cyc_b) : (i_b_stb_b)&&(o_cyc_b);
+	assign	o_adr     = ((o_stb_a)|(o_stb_b))?((r_a_owner) ? i_a_adr   : i_b_adr):0;
+	assign	o_dat     = (o_stb)?((r_a_owner) ? i_a_dat   : i_b_dat):0;
+	assign	o_sel     = (o_stb)?((r_a_owner) ? i_a_sel   : i_b_sel):0;
+	assign	o_a_ack   = (o_cyc)&&( r_a_owner) ? i_ack   : 1'b0;
+	assign	o_b_ack   = (o_cyc)&&(!r_a_owner) ? i_ack   : 1'b0;
 	assign	o_a_stall = (o_cyc)&&( r_a_owner) ? i_stall : 1'b1;
-	assign	o_b_stall = (o_cyc)&&(~r_a_owner) ? i_stall : 1'b1;
-	assign	o_a_err = (o_cyc)&&( r_a_owner) ? i_err : 1'b0;
-	assign	o_b_err = (o_cyc)&&(~r_a_owner) ? i_err : 1'b0;
+	assign	o_b_stall = (o_cyc)&&(!r_a_owner) ? i_stall : 1'b1;
+	assign	o_a_err   = (o_cyc)&&( r_a_owner) ? i_err : 1'b0;
+	assign	o_b_err   = (o_cyc)&&(!r_a_owner) ? i_err : 1'b0;
 `else
 	// Realistically, if neither master owns the bus, the output is a
 	// don't care.  Thus we trigger off whether or not 'A' owns the bus.
@@ -150,7 +191,6 @@ module	wbdblpriarb(i_clk, i_rst,
 	// irrelevant.
 	assign o_stb_a = (r_a_owner) ? i_a_stb_a : i_b_stb_a;
 	assign o_stb_b = (r_a_owner) ? i_a_stb_b : i_b_stb_b;
-	assign o_we    = (r_a_owner) ? i_a_we    : i_b_we;
 	assign o_adr   = (r_a_owner) ? i_a_adr   : i_b_adr;
 	assign o_dat   = (r_a_owner) ? i_a_dat   : i_b_dat;
 	assign o_sel   = (r_a_owner) ? i_a_sel   : i_b_sel;
@@ -159,19 +199,19 @@ module	wbdblpriarb(i_clk, i_rst,
 	// the master in question does not own the bus.  Hence we force it
 	// low if the particular master doesn't own the bus.
 	assign	o_a_ack   = ( r_a_owner) ? i_ack   : 1'b0;
-	assign	o_b_ack   = (~r_a_owner) ? i_ack   : 1'b0;
+	assign	o_b_ack   = (!r_a_owner) ? i_ack   : 1'b0;
 
 	// Stall must be asserted on the same cycle the input master asserts
 	// the bus, if the bus isn't granted to him.
 	assign	o_a_stall = ( r_a_owner) ? i_stall : 1'b1;
-	assign	o_b_stall = (~r_a_owner) ? i_stall : 1'b1;
+	assign	o_b_stall = (!r_a_owner) ? i_stall : 1'b1;
 
 	//
 	// These error lines will be implemented soon, as soon as the rest of
 	// the Zip CPU is ready to support them.
 	//
 	assign	o_a_err = ( r_a_owner) ? i_err : 1'b0;
-	assign	o_b_err = (~r_a_owner) ? i_err : 1'b0;
+	assign	o_b_err = (!r_a_owner) ? i_err : 1'b0;
 `endif
 
 endmodule

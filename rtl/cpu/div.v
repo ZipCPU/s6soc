@@ -34,7 +34,7 @@
 //
 //
 //	At this point, the divide is has started.  The divide works by walking
-//	through every shift of the 
+//	through every shift of the
 //
 //		    DIVIDEND	over the
 //		DIVISOR
@@ -50,7 +50,7 @@
 //		DIVIDEND
 //		DIVISOR
 //
-//	At this point, if the DIVISOR is less than the dividend, the 
+//	At this point, if the DIVISOR is less than the dividend, the
 //	divisor is subtracted from the dividend, and the DIVISOR is again
 //	shifted to the right.  Further, a '1' bit gets set in the output
 //	quotient.
@@ -62,7 +62,7 @@
 //
 //	On the clock when we are done, o_busy is set to false, and o_valid set
 //	to true.  (It is a violation of the ZipCPU internal protocol for both
-//	busy and valid to ever be true on the same clock.  It is also a 
+//	busy and valid to ever be true on the same clock.  It is also a
 //	violation for busy to be false with valid true thereafter.)
 //
 //
@@ -95,15 +95,17 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
+`default_nettype	none
+//
 // `include "cpudefs.v"
 //
 module	div(i_clk, i_rst, i_wr, i_signed, i_numerator, i_denominator,
 		o_busy, o_valid, o_err, o_quotient, o_flags);
 	parameter		BW=32, LGBW = 5;
-	input			i_clk, i_rst;
+	input	wire		i_clk, i_rst;
 	// Input parameters
-	input			i_wr, i_signed;
-	input	[(BW-1):0]	i_numerator, i_denominator;
+	input	wire		i_wr, i_signed;
+	input	wire [(BW-1):0]	i_numerator, i_denominator;
 	// Output parameters
 	output	reg		o_busy, o_valid, o_err;
 	output	reg [(BW-1):0]	o_quotient;
@@ -149,9 +151,9 @@ module	div(i_clk, i_rst, i_wr, i_signed, i_numerator, i_denominator,
 			o_busy <= 1'b0;
 		else if (i_wr)
 			o_busy <= 1'b1;
-		else if (((last_bit)&&(~r_sign))||(zero_divisor))
+		else if (((last_bit)&&(!r_sign))||(zero_divisor))
 			o_busy <= 1'b0;
-		else if (~r_busy)
+		else if (!r_busy)
 			o_busy <= 1'b0;
 
 	// If we are asked to divide by zero, we need to halt.  The sooner

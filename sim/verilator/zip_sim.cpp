@@ -386,7 +386,7 @@ public:
 				printf("%s\n", ledstr);
 				fprintf(m_dbg, "%s\n", ledstr);
 			} else {
-				printf("%s\r", ledstr);
+				printf("%s\n", ledstr);
 				fflush(stdout);
 			}
 			m_last_led  = m_core->o_led;
